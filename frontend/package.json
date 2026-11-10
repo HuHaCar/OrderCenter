@@ -1,0 +1,34 @@
+{
+  "name": "order-center-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
+    "ant-design-vue": "^4.2.6",
+    "axios": "^1.21.0",
+    "dayjs": "^1.11.13",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.45",
+    "vue-router": "^4.6.4",
+    "vxe-pc-ui": "^4.20.39",
+    "vxe-table": "^4.23.16",
+    "xe-utils": "4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "~5.8.3",
+    "vite": "^5.4.21",
+    "vue-tsc": "^2.2.12"
+  },
+  "overrides": {
+    "xe-utils": "4.1.5"
+  }
+}
