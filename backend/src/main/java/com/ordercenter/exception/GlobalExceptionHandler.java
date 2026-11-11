@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -30,6 +31,12 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage() == null ? "参数校验失败" : error.getDefaultMessage())
                 .orElse("参数校验失败");
         return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(404, "接口不存在"));
     }
 
     @ExceptionHandler(Exception.class)

@@ -84,7 +84,9 @@ const props = defineProps<{
 }>()
 
 const orderStore = useOrderStore()
-const rows = ref<Order[]>([])
+type OrderRow = Order & { serial: number }
+
+const rows = ref<OrderRow[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
 const tableHeight = ref(520)
@@ -106,6 +108,7 @@ onBeforeUnmount(() => {
 })
 
 const columns: BaseTableColumn[] = [
+  { key: 'serial', field: 'serial', title: '序号', width: 70, align: 'center' },
   { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
   { key: 'customerName', field: 'customerName', title: '客户', width: 105 },
   { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 135 },
@@ -134,7 +137,10 @@ async function loadOrders() {
     })
 
     if (seq !== requestSeq) return
-    rows.value = result.records
+    rows.value = result.records.map((order, index) => ({
+      ...order,
+      serial: (result.page - 1) * result.size + index + 1,
+    }))
     orderStore.setTotal(result.total)
   } catch (error) {
     if (seq !== requestSeq) return

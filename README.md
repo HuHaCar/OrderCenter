@@ -137,7 +137,7 @@ cd backend
 
 - 健康检查：http://localhost:8080/api/health
 - Swagger UI：http://localhost:8080/swagger-ui.html
-- 订单接口：http://localhost:8080/api/orders?page=1&size=20
+- 订单接口：http://localhost:8080/api/queryOrderList?page=1&size=20
 
 示例响应：
 
@@ -209,7 +209,7 @@ docker compose -f docker-compose.dev.yml down -v
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/health` | 健康检查 |
-| GET | `/api/orders?page=1&size=100&keyword=&status=` | 订单分页查询 |
+| GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
 
 `page` 从 1 开始，`size` 最大 200。`status` 可选值：
 
@@ -232,6 +232,6 @@ docker compose -f docker-compose.dev.yml down -v
 ## 调试建议
 
 - 后端启动失败时，先看终端异常；权限、数据库连接、Flyway SQL 是高频问题。
-- 前端 404 / 500：打开浏览器 Network 面板确认 `/api/orders` 的响应。
+- 前端 404 / 500：打开浏览器 Network 面板确认 `/api/queryOrderList` 的响应。
 - 表格没有数据：先直接访问后端接口，确认返回 `records` 是否有值。
 - 本地数据库状态异常：`docker compose -f docker-compose.dev.yml down -v` 清空后重启，Flyway 会重跑。

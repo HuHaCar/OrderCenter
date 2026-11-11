@@ -6,7 +6,7 @@ import http, { unwrap } from './http'
  * 业务组件不直接依赖具体 API，方便测试与复用。
  */
 export function getOrderList(params: OrderQuery): Promise<PageResult<Order>> {
-  return unwrap<PageResult<Order>>(http.get('/orders', { params }))
+  return unwrap<PageResult<Order>>(http.get('/queryOrderList', { params }))
 }
 
 export function getHealth(): Promise<Record<string, unknown>> {

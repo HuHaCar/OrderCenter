@@ -36,7 +36,7 @@ public class OrderController {
     }
 
     @Operation(summary = "分页查询订单")
-    @GetMapping("/orders")
+    @GetMapping("/queryOrderList")
     public ApiResponse<PageResult<OrderResponse>> page(
             @Parameter(description = "页码，从 1 开始")
             @RequestParam(defaultValue = "1") int page,
