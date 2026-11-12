@@ -1,5 +1,9 @@
 <template>
-  <TableView :fetch-api="getOrderList">
+  <TableView
+    :fetch-api="getOrderList"
+    :columns="orderColumns"
+    :format-result="formatOrderResult"
+  >
     <template #filters>
       <div class="order-filters">
         <a-form layout="inline" class="filter-form" :model="orderStore.filters">
@@ -26,16 +30,27 @@
 
           <a-form-item class="filter-form__actions">
             <a-space>
-              <a-button type="primary" @click="orderStore.search">
+              <a-button
+                type="primary"
+                :loading="isSearching"
+                :disabled="orderStore.loading && !isSearching"
+                @click="orderStore.search"
+              >
                 <template #icon><SearchOutlined /></template>
                 查询
               </a-button>
-              <a-button @click="orderStore.reset">重置</a-button>
+              <a-button
+                :loading="isResetting"
+                :disabled="orderStore.loading && !isResetting"
+                @click="orderStore.reset"
+              >
+                重置
+              </a-button>
             </a-space>
           </a-form-item>
         </a-form>
 
-        <a-button type="primary" class="order-filters__create" @click="handleCreate">
+        <a-button type="primary" class="order-filters__create" @click="openCreateModal">
           <template #icon><PlusOutlined /></template>
           新建订单
         </a-button>
@@ -50,24 +65,72 @@
       </a-space>
     </template>
   </TableView>
+
+  <a-modal
+    v-model:open="createModal.state.visible"
+    title="新增订单"
+    :confirm-loading="createModal.state.loading"
+    ok-text="关闭"
+    @ok="createModal.close"
+    @cancel="createModal.close"
+  >
+    <a-empty description="新增订单表单将在下一阶段接入" />
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
+import { computed } from 'vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import { getOrderList } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
+import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
+import type { BaseTableColumn, TableResult } from '@/types/table'
+import type { Order, PageResult } from '@/types/order'
 
 /**
- * 路由级页面：只负责提供页面级 TableView 所需的插槽内容。
- * 查询条件和批量操作通过插槽传入，业务表格由 TableView 负责组装。
+ * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
+ * 表格的数据获取和渲染由 TableView + BusinessTable 负责。
  */
 const orderStore = useOrderStore()
+const createModal = useModal()
+const isSearching = computed(
+  () => orderStore.loading && orderStore.loadingAction === 'search',
+)
+const isResetting = computed(
+  () => orderStore.loading && orderStore.loadingAction === 'reset',
+)
 
-function handleCreate() {
-  message.info('新增订单表单将在下一阶段接入')
+const orderColumns: BaseTableColumn[] = [
+  { key: 'serial', field: 'serial', title: '序号', width: 70, align: 'center' },
+  { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
+  { key: 'customerName', field: 'customerName', title: '客户', width: 105 },
+  { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 135 },
+  { key: 'productName', field: 'productName', title: '商品', minWidth: 200 },
+  { key: 'quantity', field: 'quantity', title: '数量', width: 74, align: 'right' },
+  { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 130, align: 'right' },
+  { key: 'status', field: 'status', title: '状态', width: 104, align: 'center' },
+  { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 160 },
+]
+
+/**
+ * 页面级响应适配器。
+ * 当前后端返回 records/total/page/size；
+ * 如果后端改成 InnerList/TotalCount，只需要在这里改映射。
+ */
+function formatOrderResult(result: unknown): TableResult<Order> {
+  const page = result as Partial<PageResult<Order>> | null | undefined
+  return {
+    data: page?.records ?? [],
+    total: page?.total ?? 0,
+    page: page?.page,
+    size: page?.size,
+  }
+}
+
+function openCreateModal() {
+  createModal.open()
 }
 </script>
 

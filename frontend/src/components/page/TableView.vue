@@ -4,7 +4,11 @@
       <slot name="filters" />
     </a-card>
 
-    <BusinessTable :fetch-api="fetchApi">
+    <BusinessTable
+      :fetch-api="fetchApi"
+      :columns="columns"
+      :format-result="formatResult"
+    >
       <template #toolbar>
         <slot name="batch-actions" />
       </template>
@@ -14,17 +18,19 @@
 
 <script setup lang="ts">
 import BusinessTable from '@/components/business/BusinessTable.vue'
-import type { Order, OrderQuery, PageResult } from '@/types/order'
+import type { BaseTableColumn, TableResultFormatter } from '@/types/table'
+import type { Order, OrderQuery } from '@/types/order'
 
 /**
  * 页面级布局组件：统一组装“筛选区 + 表格区”。
- * 查询条件、批量操作等页面元素通过插槽由路由页面传入。
- * 具体的数据获取仍然下沉在 BusinessTable。
+ * 表头与后端响应格式都由路由页面传入，具体数据获取下沉在 BusinessTable。
  */
 defineOptions({ name: 'TableView' })
 
 defineProps<{
-  fetchApi: (query: OrderQuery) => Promise<PageResult<Order>>
+  fetchApi: (query: OrderQuery) => Promise<unknown>
+  columns: BaseTableColumn[]
+  formatResult?: TableResultFormatter<Order>
 }>()
 </script>
 

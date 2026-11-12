@@ -34,6 +34,7 @@ OrderCenter/
 │       │   ├── business/             # ② 业务组件：BusinessTable
 │       │   └── page/                 # ③ 页面级布局：TableView
 │       ├── pages/order/              # ④ 路由级页面：OrderCenterPage
+│       ├── composables/              # useModal 等通用交互 Hook
 │       ├── layouts/                  # 后台外壳（侧边栏、顶栏）
 │       ├── router/                   # 路由里引入页面级组件
 │       ├── stores/                   # Pinia：筛选、分页、总数
@@ -53,19 +54,27 @@ OrderCenter/
 - UI 基础组件放在 `components/ui`，业务组件放在 `components/business`，页面级布局组件放在 `components/page`，路由级页面放在 `pages`。
 - 业务组件不要直接 import 具体 API，通过父组件传入的 props 获取接口。
 - 页面级布局组件负责组装业务组件和布局插槽；路由级页面只负责提供插槽内容与注入 API。
+- 所有会触发后端请求的按钮必须绑定 loading，禁止“点击后无反馈”；新增功能沿用同一规则。
+- 弹窗交互统一使用 `composables/useModal.ts`，由 Hook 管理 `visible`、`loading` 和业务数据。
+- 表头 columns 与后端响应格式 formatResult 由路由级页面传入；业务组件提供默认响应适配。
 
 ## 前端分层组件设计
 
 ```text
 路由 router/index.ts
   └── 路由级页面 pages/order/OrderCenterPage.vue
-        ├── Pinia store：筛选条件 / 分页 / 总数
+        ├── Pinia store：筛选条件 / 分页 / 总数 / loading
         ├── 引入 getOrderList（API 函数）
+        ├── 定义 orderColumns（表头）
+        ├── 定义 formatOrderResult（响应适配）
         └── 页面级布局组件 components/page/TableView.vue
+              ├── :columns / :format-result
               ├── #filters 插槽        ← 查询条件 + 新建按钮
               ├── #batch-actions 插槽  ← 表格顶部批量操作
               └── 业务组件 components/business/BusinessTable.vue
                     ├── props.fetchApi ← 路由页经 TableView 注入
+                    ├── props.columns  ← 表头由外层传入
+                    ├── props.formatResult ← 响应格式由外层传入（可选）
                     ├── 负责加载数据、处理 loading / error / 分页
                     └── UI 基础组件 components/ui/BaseTable.vue
                           └── 基于 vxe-table，开启虚拟滚动
@@ -82,17 +91,21 @@ OrderCenter/
 2. **业务组件 `BusinessTable.vue`**
    - 负责订单列表的数据获取、分页、错误和加载状态。
    - 不直接 import API，而是通过 `fetchApi` prop 接收，方便替换接口、写测试或复用到其他页面。
-   - 从 Pinia 读取筛选条件与分页状态。
+   - 表头由 `columns` prop 传入，不再在业务组件内写死。
+   - 通过 `formatResult` 支持不同后端响应结构；未传入时使用 `{ records, total, page, size }` 默认适配。
+   - 从 Pinia 读取筛选条件、分页状态和 loading。
    - 提供 `#toolbar` 插槽，用来承载表格顶部的批量操作。
 
 3. **页面级布局组件 `TableView.vue`**
    - 负责组装筛选卡片和业务表格，统一页面布局。
    - 对外提供 `#filters` 和 `#batch-actions` 两个插槽。
-   - 把 `fetchApi` 透传给 BusinessTable，把批量操作转发到 BusinessTable 的 `#toolbar`。
+   - 把 `fetchApi`、`columns`、`formatResult` 透传给 BusinessTable，把批量操作转发到 `#toolbar`。
 
 4. **路由级页面 `OrderCenterPage.vue`**
    - 引入具体 API 和 TableView。
    - 传入查询条件、新建按钮和批量操作等插槽内容。
+   - 定义并传入表头 columns 和响应适配 formatResult。
+   - 使用 `useModal` 管理新增订单弹窗。
    - 不直接写表格渲染和页面布局细节。
 
 5. **路由**

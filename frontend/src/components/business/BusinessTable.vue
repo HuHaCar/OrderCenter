@@ -8,7 +8,12 @@
       <div v-if="$slots.toolbar" class="business-table-card__toolbar">
         <slot name="toolbar" />
       </div>
-      <a-button :loading="loading" size="small" @click="orderStore.refresh">
+      <a-button
+        :loading="orderStore.loading && orderStore.loadingAction === 'refresh'"
+        :disabled="orderStore.loading && orderStore.loadingAction !== 'refresh'"
+        size="small"
+        @click="orderStore.refresh"
+      >
         <template #icon><ReloadOutlined /></template>
         刷新
       </a-button>
@@ -27,7 +32,7 @@
     <BaseTable
       :columns="columns"
       :data="rows"
-      :loading="loading"
+      :loading="orderStore.loading"
       :height="tableHeight"
       row-key="id"
       empty-text="暂无订单，试试调整筛选条件"
@@ -56,6 +61,7 @@
         :show-size-changer="true"
         :page-size-options="['20', '50', '100', '200']"
         :show-total="showTotal"
+        :disabled="orderStore.loading"
         @change="handlePageChange"
       />
     </div>
@@ -69,7 +75,11 @@ import { ReloadOutlined } from '@ant-design/icons-vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import { ORDER_STATUS_META } from '@/constants/order'
 import { useOrderStore } from '@/stores/order'
-import type { BaseTableColumn } from '@/types/table'
+import type {
+  BaseTableColumn,
+  TableResult,
+  TableResultFormatter,
+} from '@/types/table'
 import type { Order, OrderQuery, PageResult } from '@/types/order'
 import { formatCurrency, formatDateTime } from '@/utils/format'
 
@@ -80,17 +90,33 @@ import { formatCurrency, formatDateTime } from '@/utils/format'
 defineOptions({ name: 'BusinessTable' })
 
 const props = defineProps<{
-  fetchApi: (query: OrderQuery) => Promise<PageResult<Order>>
+  fetchApi: (query: OrderQuery) => Promise<unknown>
+  columns: BaseTableColumn[]
+  formatResult?: TableResultFormatter<Order>
 }>()
 
 const orderStore = useOrderStore()
 type OrderRow = Order & { serial: number }
 
 const rows = ref<OrderRow[]>([])
-const loading = ref(false)
 const errorMessage = ref('')
 const tableHeight = ref(520)
 let requestSeq = 0
+
+/**
+ * 业务组件的默认响应格式：
+ * 当前后端返回 { records, total, page, size }。
+ * 页面级组件可以通过 format-result 覆盖成其他结构。
+ */
+function defaultFormatResult(result: unknown): TableResult<Order> {
+  const page = result as Partial<PageResult<Order>> | null | undefined
+  return {
+    data: page?.records ?? [],
+    total: page?.total ?? 0,
+    page: page?.page,
+    size: page?.size,
+  }
+}
 
 /** 根据视口高度调整表格高度，保证底部分页条始终可见。 */
 function syncTableHeight() {
@@ -107,29 +133,17 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', syncTableHeight)
 })
 
-const columns: BaseTableColumn[] = [
-  { key: 'serial', field: 'serial', title: '序号', width: 70, align: 'center' },
-  { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
-  { key: 'customerName', field: 'customerName', title: '客户', width: 105 },
-  { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 135 },
-  { key: 'productName', field: 'productName', title: '商品', minWidth: 200 },
-  { key: 'quantity', field: 'quantity', title: '数量', width: 74, align: 'right' },
-  { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 130, align: 'right' },
-  { key: 'status', field: 'status', title: '状态', width: 104, align: 'center' },
-  { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 160 },
-]
-
 function showTotal(total: number) {
   return `共 ${total} 条`
 }
 
 async function loadOrders() {
   const seq = ++requestSeq
-  loading.value = true
+  orderStore.setLoading(true)
   errorMessage.value = ''
 
   try {
-    const result = await props.fetchApi({
+    const rawResult = await props.fetchApi({
       page: orderStore.page,
       size: orderStore.pageSize,
       keyword: orderStore.filters.keyword.trim() || undefined,
@@ -137,9 +151,14 @@ async function loadOrders() {
     })
 
     if (seq !== requestSeq) return
-    rows.value = result.records.map((order, index) => ({
+
+    const result = (props.formatResult ?? defaultFormatResult)(rawResult)
+    const currentPage = result.page ?? orderStore.page
+    const currentSize = result.size ?? orderStore.pageSize
+
+    rows.value = result.data.map((order, index) => ({
       ...order,
-      serial: (result.page - 1) * result.size + index + 1,
+      serial: (currentPage - 1) * currentSize + index + 1,
     }))
     orderStore.setTotal(result.total)
   } catch (error) {
@@ -150,7 +169,7 @@ async function loadOrders() {
     message.error(errorMessage.value)
   } finally {
     if (seq === requestSeq) {
-      loading.value = false
+      orderStore.setLoading(false)
     }
   }
 }
