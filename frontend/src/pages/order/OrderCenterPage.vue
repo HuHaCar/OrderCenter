@@ -66,28 +66,26 @@
     </template>
   </TableView>
 
-  <a-modal
-    v-model:open="createModal.state.visible"
-    title="新增订单"
-    :confirm-loading="createModal.state.loading"
-    ok-text="关闭"
-    @ok="createModal.close"
-    @cancel="createModal.close"
-  >
-    <a-empty description="新增订单表单将在下一阶段接入" />
-  </a-modal>
+  <OrderFormModal
+    :open="createModal.state.visible"
+    :loading="createModal.state.loading"
+    @update:open="createModal.close"
+    @submit="handleCreateOrder"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
-import { getOrderList } from '@/api/order'
+import OrderFormModal from '@/components/business/OrderFormModal.vue'
+import { createOrder, getOrderList } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
 import type { BaseTableColumn, TableResult } from '@/types/table'
-import type { Order, PageResult } from '@/types/order'
+import type { CreateOrderPayload, Order, PageResult } from '@/types/order'
 
 /**
  * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
@@ -131,6 +129,21 @@ function formatOrderResult(result: unknown): TableResult<Order> {
 
 function openCreateModal() {
   createModal.open()
+}
+
+async function handleCreateOrder(payload: CreateOrderPayload) {
+  createModal.setLoading(true)
+
+  try {
+    const created = await createOrder(payload)
+    createModal.setLoading(false)
+    createModal.close()
+    message.success(`订单 ${created.orderNo} 创建成功`)
+    orderStore.search()
+  } catch (error) {
+    createModal.setLoading(false)
+    message.error(error instanceof Error ? error.message : '创建订单失败')
+  }
 }
 </script>
 

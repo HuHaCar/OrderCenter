@@ -1,6 +1,7 @@
 package com.ordercenter.order;
 
 import com.ordercenter.common.PageResult;
+import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -11,9 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Transactional(readOnly = true)
@@ -63,5 +69,37 @@ public class OrderService {
                 .toList();
 
         return new PageResult<>(records, result.getTotalElements(), safePage, safeSize);
+    }
+
+    /**
+     * 新增订单。
+     * 注意：类上是 readOnly=true，所以写操作必须显式覆盖为读写事务。
+     */
+    @Transactional
+    public OrderResponse create(CreateOrderRequest request) {
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setCustomerName(request.customerName().trim());
+        order.setCustomerPhone(request.customerPhone().trim());
+        order.setProductName(request.productName().trim());
+        order.setQuantity(request.quantity());
+        order.setUnitPrice(request.unitPrice());
+        order.setTotalAmount(
+                request.unitPrice()
+                        .multiply(BigDecimal.valueOf(request.quantity()))
+                        .setScale(2, RoundingMode.HALF_UP)
+        );
+        order.setStatus(OrderStatus.FORECAST);
+        order.setRemark(StringUtils.hasText(request.remark()) ? request.remark().trim() : null);
+
+        Order saved = orderRepository.save(order);
+        return OrderResponse.from(saved);
+    }
+
+    private String generateOrderNo() {
+        String timePart = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        int randomPart = ThreadLocalRandom.current().nextInt(100000, 1000000);
+        return "ORD" + timePart + randomPart;
     }
 }

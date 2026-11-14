@@ -4,10 +4,10 @@
 
 - 后端：Spring Boot 3.5 + Java 21 + Spring Data JPA + MySQL 8 + Flyway + Swagger
 - 前端：Vue 3 + TypeScript + Vite + Ant Design Vue 4 + Pinia + vxe-table
-- 当前里程碑：跑通「数据库 → 后端分页接口 → 前端分层组件 → 路由页面」的订单列表链路
+- 当前里程碑：跑通「数据库 → 后端接口 → 前端分层组件 → 路由页面」的订单列表与新增订单链路
 - 演示数据：350 条订单
 
-> 当前是骨架版本，包含订单查询、搜索、状态筛选和分页；新增 / 编辑 / 删除会在下一阶段补齐。
+> 当前包含订单查询、搜索、状态筛选、分页和新增订单；编辑 / 删除会在下一阶段补齐。
 
 ![订单中心运行界面](docs/order-center.png)
 
@@ -28,7 +28,7 @@ OrderCenter/
 │   └── .mvn/
 ├── frontend/                         # Vue 3 前端
 │   └── src/
-│       ├── api/                      # Axios 实例 + 接口函数
+│       ├── api/                      # Axios 实例 + 接口函数（查询 / 新增）
 │       ├── components/
 │       │   ├── ui/                   # ① UI 基础组件：BaseTable
 │       │   ├── business/             # ② 业务组件：BusinessTable
@@ -49,6 +49,9 @@ OrderCenter/
 ```
 
 ## 代码约定
+
+- 所有弹窗统一使用 `components/ui/BaseModal.vue`，不要直接使用 `a-modal`；BaseModal 默认禁止点击遮罩关闭。
+- 带校验的表单使用 `.stable-form` 类；弹窗内的表单已由全局样式自动处理。校验文案使用绝对定位并预留高度，避免出现错误提示时弹窗高度跳动。
 
 - Vue 单文件组件统一按 **`<template>` → `<script setup>` → `<style>`** 的顺序书写。
 - UI 基础组件放在 `components/ui`，业务组件放在 `components/business`，页面级布局组件放在 `components/page`，路由级页面放在 `pages`。
@@ -208,8 +211,28 @@ docker compose -f docker-compose.dev.yml down -v
   - `V1__create_orders.sql`：建表
   - `V2__seed_orders.sql`：基础演示数据 80 条
   - `V3__seed_more_orders.sql`：扩充 270 条，共 350 条
+  - `V4__change_order_status_codes.sql`：旧状态迁移为单字母 code
 
 修改表结构时新增 `V3__*.sql`，不要改已经执行过的脚本。
+
+## 订单状态
+
+| code | 名称 |
+|---|---|
+| T | 草稿 |
+| S | 已预报 |
+| R | 已收货 |
+| D | 已发货 |
+| F | 已退件 |
+| V | 已签收 |
+| P | 已理赔 |
+| C | 已删除 |
+| Q | 弃件 |
+
+- 新增订单默认状态：`S 已预报`
+- 状态流转：`T → S → R → D`；`D` 可到 `V / Q / P`；`V` 可到 `F`
+- `C 已删除` 由列表删除动作直接设置，不作为普通流转目标
+- 历史状态映射：`PENDING→T`、`PAID→S`、`SHIPPED→D`、`COMPLETED→V`、`CANCELLED→C`
 
 ## 接口约定
 
@@ -223,10 +246,26 @@ docker compose -f docker-compose.dev.yml down -v
 |---|---|---|
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
+| POST | `/api/createOrder` | 新增订单 |
+
+新增订单请求示例：
+
+```json
+{
+  "customerName": "张伟",
+  "customerPhone": "13800000000",
+  "productName": "格瑞维亚 2027款 尊贵版",
+  "quantity": 2,
+  "unitPrice": 359800,
+  "remark": "备注可选"
+}
+```
+
+订单号、总金额、初始状态由后端生成，前端不要传 `orderNo`、`totalAmount`、`status`。
 
 `page` 从 1 开始，`size` 最大 200。`status` 可选值：
 
-`PENDING` / `PAID` / `SHIPPED` / `COMPLETED` / `CANCELLED`
+`T` 草稿 / `S` 已预报 / `R` 已收货 / `D` 已发货 / `F` 已退件 / `V` 已签收 / `P` 已理赔 / `C` 已删除 / `Q` 弃件
 
 ## 下一阶段
 

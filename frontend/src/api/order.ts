@@ -1,4 +1,4 @@
-import type { Order, OrderQuery, PageResult } from '@/types/order'
+import type { CreateOrderPayload, Order, OrderQuery, PageResult } from '@/types/order'
 import http, { unwrap } from './http'
 
 /**
@@ -7,6 +7,10 @@ import http, { unwrap } from './http'
  */
 export function getOrderList(params: OrderQuery): Promise<PageResult<Order>> {
   return unwrap<PageResult<Order>>(http.get('/queryOrderList', { params }))
+}
+
+export function createOrder(payload: CreateOrderPayload): Promise<Order> {
+  return unwrap<Order>(http.post('/createOrder', payload))
 }
 
 export function getHealth(): Promise<Record<string, unknown>> {

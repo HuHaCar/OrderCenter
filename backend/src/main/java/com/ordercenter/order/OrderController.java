@@ -2,11 +2,15 @@ package com.ordercenter.order;
 
 import com.ordercenter.common.ApiResponse;
 import com.ordercenter.common.PageResult;
+import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,9 +51,15 @@ public class OrderController {
             @Parameter(description = "订单号、客户姓名或商品名称")
             @RequestParam(required = false) String keyword,
 
-            @Parameter(description = "订单状态")
-            @RequestParam(required = false) OrderStatus status
+            @Parameter(description = "订单状态：T/S/R/D/F/V/P/C/Q")
+            @RequestParam(required = false) String status
     ) {
-        return ApiResponse.ok(orderService.page(page, size, keyword, status));
+        return ApiResponse.ok(orderService.page(page, size, keyword, OrderStatus.fromCode(status)));
+    }
+
+    @Operation(summary = "新增订单")
+    @PostMapping("/createOrder")
+    public ApiResponse<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+        return ApiResponse.ok(orderService.create(request));
     }
 }

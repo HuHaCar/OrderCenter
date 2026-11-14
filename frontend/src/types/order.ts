@@ -1,4 +1,4 @@
-export type OrderStatus = 'PENDING' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+export type OrderStatus = 'T' | 'S' | 'R' | 'D' | 'F' | 'V' | 'P' | 'C' | 'Q'
 
 export interface Order {
   id: number
@@ -32,4 +32,13 @@ export interface PageResult<T> {
 export interface OrderFilters {
   keyword: string
   status?: OrderStatus
+}
+
+export interface CreateOrderPayload {
+  customerName: string
+  customerPhone: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  remark?: string
 }

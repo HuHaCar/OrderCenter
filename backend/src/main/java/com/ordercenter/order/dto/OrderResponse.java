@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 /**
  * 对外响应对象，避免直接暴露 JPA Entity。
- * status 同时返回枚举值和中文标签，前端可直接展示。
+ * status 返回单字母业务编码，例如 D；statusLabel 返回中文名称。
  */
 public record OrderResponse(
         Long id,
@@ -34,7 +34,7 @@ public record OrderResponse(
                 order.getQuantity(),
                 order.getUnitPrice(),
                 order.getTotalAmount(),
-                order.getStatus().name(),
+                order.getStatus().getCode(),
                 order.getStatus().getLabel(),
                 order.getRemark(),
                 order.getCreatedAt()

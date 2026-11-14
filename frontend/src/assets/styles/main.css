@@ -67,3 +67,36 @@ textarea {
 .ant-tag {
   border-radius: 6px;
 }
+
+/*
+ * 表单校验稳定布局：
+ * Ant Design Vue 的校验提示会插入到 form-item 的文档流里，
+ * 出现错误时会把后续内容向下推，导致弹窗高度跳动。
+ * 这里为提示文案预留固定空间，并让提示绝对定位在预留区域内。
+ *
+ * .ant-modal 覆盖所有弹窗表单；.stable-form 可用于非弹窗表单。
+ */
+.ant-modal .ant-form-item,
+.stable-form .ant-form-item {
+  position: relative;
+  margin-bottom: 4px;
+  padding-bottom: 22px;
+}
+
+/* 让校验文案相对整个 form-item 定位，而不是相对输入框区域定位 */
+.ant-modal .ant-form-item-control,
+.stable-form .ant-form-item-control {
+  position: static;
+}
+
+.ant-modal .ant-form-item-explain,
+.stable-form .ant-form-item-explain {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  margin-top: 0;
+  font-size: 12px;
+  line-height: 20px;
+}
