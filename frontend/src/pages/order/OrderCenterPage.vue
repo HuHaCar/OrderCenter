@@ -64,16 +64,24 @@
 
     <template #batch-actions>
       <a-space class="batch-actions" :size="8">
-        <span class="batch-actions__label">已选 {{ selectedOrderIds.length }} 项</span>
+        <span class="batch-actions__label">已选 {{ selectedOrders.length }} 项</span>
+        <a-button
+          size="small"
+          :disabled="!selectedOrders.length"
+          :loading="exportConfirm.state.loading"
+          @click="openBatchExportConfirm"
+        >
+          批量导出
+        </a-button>
         <a-button
           size="small"
           danger
-          :disabled="!selectedOrderIds.length"
+          :disabled="!canBatchDelete"
+          :title="selectedOrders.length && !canBatchDelete ? '仅草稿或已预报订单可以删除' : undefined"
           @click="openBatchDeleteConfirm"
         >
           批量删除
         </a-button>
-        <a-button size="small" disabled title="下一阶段接入">导出订单</a-button>
       </a-space>
     </template>
   </TableView>
@@ -128,6 +136,26 @@
   </BaseModal>
 
   <BaseModal
+    :open="exportConfirm.state.visible"
+    title="确认导出"
+    width="420px"
+    ok-text="确认导出"
+    cancel-text="取消"
+    :confirm-loading="exportConfirm.state.loading"
+    :cancel-button-props="{ disabled: exportConfirm.state.loading }"
+    :closable="!exportConfirm.state.loading"
+    @ok="handleConfirmExport"
+    @cancel="exportConfirm.close"
+  >
+    <div class="export-confirm">
+      <p>确定要导出 <strong>{{ exportTarget?.label }}</strong> 吗？</p>
+      <p class="export-confirm__hint">
+        将下载 Excel（.xlsx）文件，导出范围包含当前选中订单的全部状态。
+      </p>
+    </div>
+  </BaseModal>
+
+  <BaseModal
     :open="forecastConfirm.state.visible"
     title="确认预报"
     width="420px"
@@ -160,12 +188,13 @@ import TableView from '@/components/page/TableView.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
 import OrderLogModal from '@/components/business/OrderLogModal.vue'
-import { createDraftOrder, createOrder, deleteOrders, forecastOrder, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
+import { createDraftOrder, createOrder, deleteOrders, exportOrders, forecastOrder, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
 import type { BaseTableColumn, TableResult } from '@/types/table'
 import type { CreateDraftPayload, CreateOrderPayload, Order, PageResult, ShippingOption } from '@/types/order'
+import { downloadBlob } from '@/utils/download'
 
 /**
  * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
@@ -180,13 +209,21 @@ const shippingOptionsLoading = ref(false)
 const draftSaving = ref(false)
 const forecastConfirm = useModal<Order>()
 const forecastTarget = forecastConfirm.data
-const selectedOrderIds = ref<number[]>([])
-interface DeleteTarget {
+const selectedOrders = ref<Order[]>([])
+const selectedOrderIds = computed(() => selectedOrders.value.map((order) => order.id))
+const canBatchDelete = computed(
+  () =>
+    selectedOrders.value.length > 0
+    && selectedOrders.value.every((order) => order.status === 'T' || order.status === 'S'),
+)
+interface BatchTarget {
   ids: number[]
   label: string
 }
-const deleteConfirm = useModal<DeleteTarget>()
+const deleteConfirm = useModal<BatchTarget>()
 const deleteTarget = deleteConfirm.data
+const exportConfirm = useModal<BatchTarget>()
+const exportTarget = exportConfirm.data
 const logModal = useModal<Order>()
 const logOrder = logModal.data
 let shippingOptionsLoaded = false
@@ -324,8 +361,8 @@ async function handleConfirmForecast() {
   }
 }
 
-function handleSelectionChange(ids: number[]) {
-  selectedOrderIds.value = ids
+function handleSelectionChange(orders: Order[]) {
+  selectedOrders.value = orders
 }
 
 function openLogModal(order: Order) {
@@ -340,11 +377,36 @@ function openDeleteConfirm(order: Order) {
 }
 
 function openBatchDeleteConfirm() {
-  if (!selectedOrderIds.value.length) return
+  if (!canBatchDelete.value) return
   deleteConfirm.open({
     ids: [...selectedOrderIds.value],
     label: `选中的 ${selectedOrderIds.value.length} 个订单`,
   })
+}
+
+function openBatchExportConfirm() {
+  if (!selectedOrderIds.value.length) return
+  exportConfirm.open({
+    ids: [...selectedOrderIds.value],
+    label: `选中的 ${selectedOrderIds.value.length} 个订单`,
+  })
+}
+
+async function handleConfirmExport() {
+  const target = exportTarget.value
+  if (!target) return
+
+  exportConfirm.setLoading(true)
+  try {
+    const file = await exportOrders(target.ids)
+    downloadBlob(file.blob, file.fileName)
+    exportConfirm.setLoading(false)
+    exportConfirm.close()
+    message.success(`已导出 ${target.ids.length} 个订单`)
+  } catch (error) {
+    exportConfirm.setLoading(false)
+    message.error(error instanceof Error ? error.message : '导出订单失败')
+  }
 }
 
 async function handleConfirmDelete() {
@@ -356,7 +418,7 @@ async function handleConfirmDelete() {
     const deleted = await deleteOrders(target.ids)
     deleteConfirm.setLoading(false)
     deleteConfirm.close()
-    selectedOrderIds.value = []
+    selectedOrders.value = []
     message.success(`已删除 ${deleted} 个订单`)
     orderStore.refresh()
   } catch (error) {
@@ -427,6 +489,28 @@ async function handleConfirmDelete() {
 }
 
 .delete-confirm__hint {
+  margin-top: 6px !important;
+  color: #98a3b3;
+  font-size: 12px;
+}
+
+.export-confirm {
+  padding: 4px 0 2px;
+  color: #4b5567;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.export-confirm p {
+  margin: 0;
+}
+
+.export-confirm strong {
+  color: #162033;
+  font-weight: 600;
+}
+
+.export-confirm__hint {
   margin-top: 6px !important;
   color: #98a3b3;
   font-size: 12px;

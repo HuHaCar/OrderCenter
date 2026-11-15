@@ -37,7 +37,6 @@
       row-key="id"
       empty-text="暂无订单，试试调整筛选条件"
       selectable
-      :selectable-method="canSelectRow"
       @selection-change="handleSelectionChange"
     >
       <template #cell-shipping="{ row }">
@@ -155,7 +154,7 @@ const emit = defineEmits<{
   (event: 'edit', order: Order): void
   (event: 'delete', order: Order): void
   (event: 'logs', order: Order): void
-  (event: 'selection-change', ids: number[]): void
+  (event: 'selection-change', orders: Order[]): void
 }>()
 
 const orderStore = useOrderStore()
@@ -238,12 +237,12 @@ async function loadOrders() {
   }
 }
 
-function canSelectRow({ row }: { row: Record<string, unknown> }) {
-  return row.status === 'T' || row.status === 'S'
-}
-
 function handleSelectionChange(ids: Array<string | number>) {
-  emit('selection-change', ids.map(Number))
+  const selectedIds = new Set(ids.map(Number))
+  emit(
+    'selection-change',
+    rows.value.filter((order) => selectedIds.has(order.id)),
+  )
 }
 
 function handlePageChange(page: number, size: number) {

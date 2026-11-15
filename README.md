@@ -2,12 +2,12 @@
 
 一个用于学习前后端全栈协作的订单中心骨架。
 
-- 后端：Spring Boot 3.5 + Java 21 + Spring Data JPA + MySQL 8 + Flyway + Swagger
+- 后端：Spring Boot 3.5 + Java 21 + Spring Data JPA + MySQL 8 + Flyway + Swagger + Apache POI
 - 前端：Vue 3 + TypeScript + Vite + Ant Design Vue 4 + Pinia + vxe-table
 - 当前里程碑：跑通「数据库 → 后端接口 → 前端分层组件 → 路由页面」的订单列表与新增订单链路
 - 演示数据：350 条订单
 
-> 当前包含订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除、操作日志。
+> 当前包含订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除、批量导出 Excel、操作日志。
 
 ![订单中心运行界面](docs/order-center.png)
 
@@ -294,6 +294,9 @@ docker compose -f docker-compose.dev.yml down -v
 | POST | `/api/createDraftOrder` | 保存订单草稿（仅运输方式 + 收件国家） |
 | POST | `/api/updateOrder` | 编辑订单（id 放在请求体，订单号不变） |
 | POST | `/api/forecastOrder` | 预报订单（请求体传 `{ id }`，仅草稿） |
+| POST | `/api/deleteOrders` | 批量删除（单行删除复用，请求体传 `{ ids }`） |
+| POST | `/api/exportOrders` | 批量导出 Excel（请求体传 `{ ids }`，返回 `.xlsx` 二进制） |
+| POST | `/api/queryOrderLogs` | 查询订单操作日志（请求体传 `{ orderId }`） |
 | GET | `/api/shippingOptions` | 查询运输方式及可到国家 |
 
 新增订单请求示例：
@@ -313,6 +316,14 @@ docker compose -f docker-compose.dev.yml down -v
 
 订单号、总金额、初始状态由后端生成，前端不要传 `orderNo`、`totalAmount`、`status`。
 
+批量导出请求示例：
+
+```json
+{ "ids": [356, 359, 3] }
+```
+
+响应类型为 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，文件名通过 `Content-Disposition` 返回。前端使用 `responseType: 'blob'` 下载；单次最多导出 200 条，导出不限制订单状态。
+
 列表默认按 `updatedAt` 倒序（最近操作的订单在前），创建、预报、编辑成功后前端会回到第 1 页。
 
 `page` 从 1 开始，`size` 最大 200。`status` 可选值：
@@ -321,9 +332,9 @@ docker compose -f docker-compose.dev.yml down -v
 
 ## 下一阶段
 
-1. 新增 / 编辑订单弹窗与后端 `POST`、`PUT`
-2. 状态流转、统计卡片
-3. 后端参数校验与接口测试
+1. 登录、权限与操作人
+2. 收货、发货、签收、退件、理赔等后续状态流转与统计卡片
+3. 后端接口自动化测试
 4. 生产 Docker Compose（Nginx + Spring Boot + MySQL）
 5. AI 能力：自然语言查订单、订单摘要（放在业务闭环稳定之后）
 

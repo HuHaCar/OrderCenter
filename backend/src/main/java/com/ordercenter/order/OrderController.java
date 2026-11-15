@@ -5,13 +5,20 @@ import com.ordercenter.common.PageResult;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.DeleteOrdersRequest;
+import com.ordercenter.order.dto.ExportOrdersRequest;
 import com.ordercenter.order.dto.ForecastOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import com.ordercenter.order.dto.UpdateOrderRequest;
+import com.ordercenter.order.export.ExportedFile;
+import com.ordercenter.order.export.OrderExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,9 +37,11 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderExportService orderExportService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderExportService orderExportService) {
         this.orderService = orderService;
+        this.orderExportService = orderExportService;
     }
 
     @Operation(summary = "健康检查")
@@ -91,5 +100,24 @@ public class OrderController {
     @PostMapping("/deleteOrders")
     public ApiResponse<Integer> deleteOrders(@Valid @RequestBody DeleteOrdersRequest request) {
         return ApiResponse.ok(orderService.deleteOrders(request.ids()));
+    }
+
+    @Operation(summary = "批量导出订单（.xlsx）")
+    @PostMapping(value = "/exportOrders", produces = OrderExportService.CONTENT_TYPE)
+    public ResponseEntity<byte[]> exportOrders(@Valid @RequestBody ExportOrdersRequest request) {
+        ExportedFile file = orderExportService.export(request.ids());
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(file.fileName())
+                                .build()
+                                .toString()
+                )
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
+                .contentType(MediaType.parseMediaType(OrderExportService.CONTENT_TYPE))
+                .contentLength(file.content().length)
+                .body(file.content());
     }
 }

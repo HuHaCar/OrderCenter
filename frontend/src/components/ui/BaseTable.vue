@@ -10,7 +10,7 @@
     :scroll-y="{ enabled: virtual, gt: 18 }"
     :show-overflow="true"
     :empty-text="emptyText"
-    :checkbox-config="{ checkMethod: selectableMethod }"
+    :checkbox-config="selectableMethod ? { checkMethod: selectableMethod } : undefined"
     @checkbox-change="emitSelection"
     @checkbox-all="emitSelection"
   >

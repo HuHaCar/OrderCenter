@@ -43,7 +43,7 @@ const emit = defineEmits<{
   (event: 'edit', order: Order): void
   (event: 'delete', order: Order): void
   (event: 'logs', order: Order): void
-  (event: 'selection-change', ids: number[]): void
+  (event: 'selection-change', orders: Order[]): void
 }>()
 </script>
 

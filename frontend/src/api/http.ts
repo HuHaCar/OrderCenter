@@ -13,12 +13,24 @@ const http = axios.create({
 
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (!error.response) {
       return Promise.reject(new Error('无法连接后端服务，请确认 8080 端口上的 Spring Boot 已启动'))
     }
 
-    const body = error.response.data as { message?: string } | undefined
+    // 下载接口使用 responseType: 'blob'，错误响应也会被包成 Blob，需要先还原 JSON。
+    let body: { message?: string } | undefined
+    const rawBody = error.response.data as unknown
+    if (rawBody instanceof Blob) {
+      try {
+        body = JSON.parse(await rawBody.text()) as { message?: string }
+      } catch {
+        body = undefined
+      }
+    } else {
+      body = rawBody as { message?: string } | undefined
+    }
+
     const status = error.response.status
 
     let message = body?.message
