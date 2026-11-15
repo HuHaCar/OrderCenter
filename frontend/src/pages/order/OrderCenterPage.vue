@@ -59,7 +59,6 @@
 
     <template #batch-actions>
       <a-space class="batch-actions" :size="8">
-        <span class="batch-actions__label">批量操作</span>
         <a-button size="small" disabled title="下一阶段接入">批量删除</a-button>
         <a-button size="small" disabled title="下一阶段接入">导出订单</a-button>
       </a-space>
@@ -71,8 +70,10 @@
     :loading="createModal.state.loading"
     :shipping-options="shippingOptions"
     :shipping-options-loading="shippingOptionsLoading"
+    :draft-loading="draftSaving"
     @update:open="createModal.close"
     @submit="handleCreateOrder"
+    @save-draft="handleSaveDraft"
   />
 </template>
 
@@ -82,12 +83,12 @@ import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
-import { createOrder, getOrderList, getShippingOptions } from '@/api/order'
+import { createDraftOrder, createOrder, getOrderList, getShippingOptions } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
 import type { BaseTableColumn, TableResult } from '@/types/table'
-import type { CreateOrderPayload, Order, PageResult, ShippingOption } from '@/types/order'
+import type { CreateDraftPayload, CreateOrderPayload, Order, PageResult, ShippingOption } from '@/types/order'
 
 /**
  * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
@@ -97,6 +98,7 @@ const orderStore = useOrderStore()
 const createModal = useModal()
 const shippingOptions = ref<ShippingOption[]>([])
 const shippingOptionsLoading = ref(false)
+const draftSaving = ref(false)
 let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
@@ -134,6 +136,7 @@ function formatOrderResult(result: unknown): TableResult<Order> {
 }
 
 function openCreateModal() {
+  draftSaving.value = false
   createModal.open()
   void ensureShippingOptions()
 }
@@ -164,6 +167,22 @@ async function handleCreateOrder(payload: CreateOrderPayload) {
   } catch (error) {
     createModal.setLoading(false)
     message.error(error instanceof Error ? error.message : '创建订单失败')
+  }
+}
+
+async function handleSaveDraft(payload: CreateDraftPayload) {
+  if (draftSaving.value) return
+  draftSaving.value = true
+
+  try {
+    const draft = await createDraftOrder(payload)
+    draftSaving.value = false
+    createModal.close()
+    message.success(`草稿 ${draft.orderNo} 已保存`)
+    orderStore.search()
+  } catch (error) {
+    draftSaving.value = false
+    message.error(error instanceof Error ? error.message : '保存草稿失败')
   }
 }
 </script>

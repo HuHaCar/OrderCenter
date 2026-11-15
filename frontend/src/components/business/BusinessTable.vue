@@ -49,7 +49,10 @@
       </template>
 
       <template #cell-totalAmount="{ row }">
-        <span class="order-amount">¥ {{ formatCurrency(row.totalAmount) }}</span>
+        <span v-if="row.totalAmount != null" class="order-amount">
+          ¥ {{ formatCurrency(row.totalAmount) }}
+        </span>
+        <span v-else class="order-amount order-amount--empty">—</span>
       </template>
 
       <template #cell-status="{ row }">
@@ -260,6 +263,11 @@ watch(() => orderStore.refreshToken, loadOrders, { immediate: true })
   color: #162033;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.order-amount--empty {
+  color: #a1abba;
+  font-weight: 400;
 }
 
 .order-time {

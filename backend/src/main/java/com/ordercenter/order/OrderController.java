@@ -2,6 +2,7 @@ package com.ordercenter.order;
 
 import com.ordercenter.common.ApiResponse;
 import com.ordercenter.common.PageResult;
+import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,5 +62,11 @@ public class OrderController {
     @PostMapping("/createOrder")
     public ApiResponse<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
         return ApiResponse.ok(orderService.create(request));
+    }
+
+    @Operation(summary = "保存订单草稿")
+    @PostMapping("/createDraftOrder")
+    public ApiResponse<OrderResponse> createDraft(@Valid @RequestBody CreateDraftOrderRequest request) {
+        return ApiResponse.ok(orderService.createDraft(request));
     }
 }

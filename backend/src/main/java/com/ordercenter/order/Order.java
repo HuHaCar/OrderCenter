@@ -30,22 +30,21 @@ public class Order {
     @Column(name = "recipient_country", nullable = false, length = 2, columnDefinition = "CHAR(2)")
     private String recipientCountry;
 
-    @Column(name = "customer_name", nullable = false, length = 50)
+    @Column(name = "customer_name", length = 50)
     private String customerName;
 
-    @Column(name = "customer_phone", nullable = false, length = 20)
+    @Column(name = "customer_phone", length = 20)
     private String customerPhone;
 
-    @Column(name = "product_name", nullable = false, length = 100)
+    @Column(name = "product_name", length = 100)
     private String productName;
 
-    @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
+    @Column(name = "unit_price", precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
+    @Column(name = "total_amount", precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
     @Convert(converter = OrderStatusConverter.class)

@@ -3,12 +3,7 @@
     :open="open"
     title="新增订单"
     width="640px"
-    ok-text="保存订单"
-    cancel-text="取消"
-    :confirm-loading="loading"
-    :cancel-button-props="{ disabled: loading }"
-    :closable="!loading"
-    @ok="handleOk"
+    :closable="!loading && !draftLoading"
     @cancel="handleCancel"
   >
     <a-form
@@ -127,6 +122,29 @@
         <strong>¥ {{ formatCurrency(estimatedAmount) }}</strong>
       </div>
     </a-form>
+
+    <template #footer>
+      <div class="order-form__footer">
+        <a-button :disabled="loading || draftLoading" @click="handleCancel">
+          取消
+        </a-button>
+        <a-button
+          :loading="draftLoading"
+          :disabled="loading"
+          @click="handleSaveDraft"
+        >
+          保存草稿
+        </a-button>
+        <a-button
+          type="primary"
+          :loading="loading"
+          :disabled="draftLoading"
+          @click="handleOk"
+        >
+          保存订单
+        </a-button>
+      </div>
+    </template>
   </BaseModal>
 </template>
 
@@ -136,7 +154,11 @@ import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { COUNTRY_OPTIONS } from '@/constants/countries'
 import { formatCurrency } from '@/utils/format'
-import type { CreateOrderPayload, ShippingOption } from '@/types/order'
+import type {
+  CreateDraftPayload,
+  CreateOrderPayload,
+  ShippingOption,
+} from '@/types/order'
 
 interface OrderFormState {
   shippingMethod: string | undefined
@@ -153,11 +175,13 @@ const props = withDefaults(
   defineProps<{
     open: boolean
     loading?: boolean
+    draftLoading?: boolean
     shippingOptions?: ShippingOption[]
     shippingOptionsLoading?: boolean
   }>(),
   {
     loading: false,
+    draftLoading: false,
     shippingOptions: () => [],
     shippingOptionsLoading: false,
   },
@@ -166,6 +190,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (event: 'update:open', value: boolean): void
   (event: 'submit', payload: CreateOrderPayload): void
+  (event: 'save-draft', payload: CreateDraftPayload): void
 }>()
 
 const formRef = ref<FormInstance>()
@@ -305,8 +330,31 @@ async function handleOk() {
   })
 }
 
+async function handleSaveDraft() {
+  if (props.loading || props.draftLoading || !formRef.value) return
+
+  try {
+    await formRef.value.validateFields(['shippingMethod', 'recipientCountry'])
+  } catch {
+    return
+  }
+
+  if (!form.shippingMethod || !form.recipientCountry) return
+
+  emit('save-draft', {
+    shippingMethod: form.shippingMethod,
+    recipientCountry: form.recipientCountry,
+    customerName: form.customerName.trim() || undefined,
+    customerPhone: form.customerPhone.trim() || undefined,
+    productName: form.productName.trim() || undefined,
+    quantity: form.quantity ?? undefined,
+    unitPrice: form.unitPrice ?? undefined,
+    remark: form.remark.trim() || undefined,
+  })
+}
+
 function handleCancel() {
-  if (props.loading) return
+  if (props.loading || props.draftLoading) return
   emit('update:open', false)
 }
 </script>
@@ -351,4 +399,12 @@ function handleCancel() {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+.order-form__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 </style>

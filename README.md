@@ -213,6 +213,7 @@ docker compose -f docker-compose.dev.yml down -v
   - `V3__seed_more_orders.sql`：扩充 270 条，共 350 条
   - `V4__change_order_status_codes.sql`：旧状态迁移为单字母 code
   - `V5__add_shipping_fields.sql`：新增运输方式、收件国家字段，旧数据默认 `THZXR` / `CN`
+  - `V6__allow_draft_order_fields.sql`：允许草稿订单的客户、商品、数量、金额为空
 
 修改表结构时新增 `V3__*.sql`，不要改已经执行过的脚本。
 
@@ -234,6 +235,16 @@ docker compose -f docker-compose.dev.yml down -v
 - 状态流转：`T → S → R → D`；`D` 可到 `V / Q / P`；`V` 可到 `F`
 - `C 已删除` 由列表删除动作直接设置，不作为普通流转目标
 - 历史状态映射：`PENDING→T`、`PAID→S`、`SHIPPED→D`、`COMPLETED→V`、`CANCELLED→C`
+
+## 草稿订单
+
+- 新订单弹窗提供“保存草稿”和“保存订单”两个操作
+- 保存草稿只强制校验运输方式和收件国家，其他字段允许为空
+- 草稿中已经填写的客户、商品、数量、单价等字段也会一并保存，但不做必填校验
+- 草稿订单状态为 `T 草稿`
+- 正式提交的订单状态为 `S 已预报`
+- 草稿与正式订单使用同一张表，区别是状态以及字段是否填写完整
+- 草稿接口：`POST /api/createDraftOrder`
 
 ## 运输方式与收件国家
 
@@ -257,6 +268,7 @@ docker compose -f docker-compose.dev.yml down -v
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
 | POST | `/api/createOrder` | 新增订单 |
+| POST | `/api/createDraftOrder` | 保存订单草稿（仅运输方式 + 收件国家） |
 | GET | `/api/shippingOptions` | 查询运输方式及可到国家 |
 
 新增订单请求示例：

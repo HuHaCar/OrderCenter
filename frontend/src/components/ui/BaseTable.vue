@@ -22,7 +22,7 @@
     >
       <template #default="{ row }">
         <slot :name="`cell-${column.key}`" :row="row" :column="column">
-          {{ column.formatter ? column.formatter(row[column.field], row) : row[column.field] }}
+          {{ column.formatter ? column.formatter(row[column.field], row) : (row[column.field] ?? '—') }}
         </slot>
       </template>
     </vxe-column>

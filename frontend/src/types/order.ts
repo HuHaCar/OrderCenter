@@ -6,12 +6,12 @@ export interface Order {
   shippingMethod: string
   shippingMethodLabel: string
   recipientCountry: string
-  customerName: string
-  customerPhone: string
-  productName: string
-  quantity: number
-  unitPrice: number
-  totalAmount: number
+  customerName: string | null
+  customerPhone: string | null
+  productName: string | null
+  quantity: number | null
+  unitPrice: number | null
+  totalAmount: number | null
   status: OrderStatus
   statusLabel: string
   remark: string | null
@@ -53,4 +53,15 @@ export interface ShippingOption {
   name: string
   allCountries: boolean
   countryCodes: string[]
+}
+
+export interface CreateDraftPayload {
+  shippingMethod: string
+  recipientCountry: string
+  customerName?: string
+  customerPhone?: string
+  productName?: string
+  quantity?: number
+  unitPrice?: number
+  remark?: string
 }

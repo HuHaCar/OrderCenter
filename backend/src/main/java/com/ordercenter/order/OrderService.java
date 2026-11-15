@@ -1,6 +1,7 @@
 package com.ordercenter.order;
 
 import com.ordercenter.common.PageResult;
+import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import com.ordercenter.shipping.ShippingMethodCatalog;
@@ -104,6 +105,40 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
+    }
+
+    /**
+     * 保存草稿：只校验运输方式和收件国家，其他字段允许为空。
+     */
+    @Transactional
+    public OrderResponse createDraft(CreateDraftOrderRequest request) {
+        shippingMethodCatalog.validate(request.shippingMethod(), request.recipientCountry());
+
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setShippingMethod(request.shippingMethod().trim().toUpperCase(Locale.ROOT));
+        order.setRecipientCountry(request.recipientCountry().trim().toUpperCase(Locale.ROOT));
+        order.setCustomerName(trimToNull(request.customerName()));
+        order.setCustomerPhone(trimToNull(request.customerPhone()));
+        order.setProductName(trimToNull(request.productName()));
+        order.setQuantity(request.quantity());
+        order.setUnitPrice(request.unitPrice());
+        order.setRemark(trimToNull(request.remark()));
+        if (request.quantity() != null && request.unitPrice() != null) {
+            order.setTotalAmount(
+                    request.unitPrice()
+                            .multiply(BigDecimal.valueOf(request.quantity()))
+                            .setScale(2, RoundingMode.HALF_UP)
+            );
+        }
+        order.setStatus(OrderStatus.DRAFT);
+
+        Order saved = orderRepository.save(order);
+        return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
+    }
+
+    private static String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String generateOrderNo() {
