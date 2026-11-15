@@ -24,6 +24,12 @@ public class Order {
     @Column(name = "order_no", nullable = false, unique = true, length = 32)
     private String orderNo;
 
+    @Column(name = "shipping_method", nullable = false, length = 20)
+    private String shippingMethod;
+
+    @Column(name = "recipient_country", nullable = false, length = 2, columnDefinition = "CHAR(2)")
+    private String recipientCountry;
+
     @Column(name = "customer_name", nullable = false, length = 50)
     private String customerName;
 
@@ -81,6 +87,22 @@ public class Order {
 
     public void setOrderNo(String orderNo) {
         this.orderNo = orderNo;
+    }
+
+    public String getShippingMethod() {
+        return shippingMethod;
+    }
+
+    public void setShippingMethod(String shippingMethod) {
+        this.shippingMethod = shippingMethod;
+    }
+
+    public String getRecipientCountry() {
+        return recipientCountry;
+    }
+
+    public void setRecipientCountry(String recipientCountry) {
+        this.recipientCountry = recipientCountry;
     }
 
     public String getCustomerName() {

@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 public record OrderResponse(
         Long id,
         String orderNo,
+        String shippingMethod,
+        String shippingMethodLabel,
+        String recipientCountry,
         String customerName,
         String customerPhone,
         String productName,
@@ -24,10 +27,13 @@ public record OrderResponse(
         LocalDateTime createdAt
 ) {
 
-    public static OrderResponse from(Order order) {
+    public static OrderResponse from(Order order, String shippingMethodLabel) {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNo(),
+                order.getShippingMethod(),
+                shippingMethodLabel,
+                order.getRecipientCountry(),
                 order.getCustomerName(),
                 order.getCustomerPhone(),
                 order.getProductName(),

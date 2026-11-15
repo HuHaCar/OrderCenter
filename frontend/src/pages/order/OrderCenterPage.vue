@@ -69,23 +69,25 @@
   <OrderFormModal
     :open="createModal.state.visible"
     :loading="createModal.state.loading"
+    :shipping-options="shippingOptions"
+    :shipping-options-loading="shippingOptionsLoading"
     @update:open="createModal.close"
     @submit="handleCreateOrder"
   />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
-import { createOrder, getOrderList } from '@/api/order'
+import { createOrder, getOrderList, getShippingOptions } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
 import type { BaseTableColumn, TableResult } from '@/types/table'
-import type { CreateOrderPayload, Order, PageResult } from '@/types/order'
+import type { CreateOrderPayload, Order, PageResult, ShippingOption } from '@/types/order'
 
 /**
  * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
@@ -93,6 +95,9 @@ import type { CreateOrderPayload, Order, PageResult } from '@/types/order'
  */
 const orderStore = useOrderStore()
 const createModal = useModal()
+const shippingOptions = ref<ShippingOption[]>([])
+const shippingOptionsLoading = ref(false)
+let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
 )
@@ -103,6 +108,7 @@ const isResetting = computed(
 const orderColumns: BaseTableColumn[] = [
   { key: 'serial', field: 'serial', title: '序号', width: 70, align: 'center' },
   { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
+  { key: 'shipping', field: 'shippingMethod', title: '运输方式', width: 190 },
   { key: 'customerName', field: 'customerName', title: '客户', width: 105 },
   { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 135 },
   { key: 'productName', field: 'productName', title: '商品', minWidth: 200 },
@@ -129,6 +135,21 @@ function formatOrderResult(result: unknown): TableResult<Order> {
 
 function openCreateModal() {
   createModal.open()
+  void ensureShippingOptions()
+}
+
+async function ensureShippingOptions() {
+  if (shippingOptionsLoaded || shippingOptionsLoading.value) return
+
+  shippingOptionsLoading.value = true
+  try {
+    shippingOptions.value = await getShippingOptions()
+    shippingOptionsLoaded = true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '运输方式加载失败')
+  } finally {
+    shippingOptionsLoading.value = false
+  }
 }
 
 async function handleCreateOrder(payload: CreateOrderPayload) {

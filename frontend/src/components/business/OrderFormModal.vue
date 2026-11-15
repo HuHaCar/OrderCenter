@@ -20,6 +20,38 @@
     >
       <a-row :gutter="16">
         <a-col :xs="24" :md="12">
+          <a-form-item label="运输方式" name="shippingMethod">
+            <a-select
+              v-model:value="form.shippingMethod"
+              show-search
+              allow-clear
+              option-filter-prop="label"
+              :options="shippingMethodOptions"
+              :loading="shippingOptionsLoading"
+              :disabled="shippingOptionsLoading || !shippingOptions.length"
+              placeholder="请选择运输方式"
+              @change="handleShippingMethodChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :xs="24" :md="12">
+          <a-form-item label="收件国家" name="recipientCountry">
+            <a-select
+              v-model:value="form.recipientCountry"
+              show-search
+              allow-clear
+              option-filter-prop="label"
+              :options="countryOptions"
+              :loading="shippingOptionsLoading"
+              :disabled="!form.shippingMethod || shippingOptionsLoading"
+              placeholder="请先选择运输方式"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row :gutter="16">
+        <a-col :xs="24" :md="12">
           <a-form-item label="客户姓名" name="customerName">
             <a-input
               v-model:value="form.customerName"
@@ -102,10 +134,13 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import { COUNTRY_OPTIONS } from '@/constants/countries'
 import { formatCurrency } from '@/utils/format'
-import type { CreateOrderPayload } from '@/types/order'
+import type { CreateOrderPayload, ShippingOption } from '@/types/order'
 
 interface OrderFormState {
+  shippingMethod: string | undefined
+  recipientCountry: string | undefined
   customerName: string
   customerPhone: string
   productName: string
@@ -118,9 +153,13 @@ const props = withDefaults(
   defineProps<{
     open: boolean
     loading?: boolean
+    shippingOptions?: ShippingOption[]
+    shippingOptionsLoading?: boolean
   }>(),
   {
     loading: false,
+    shippingOptions: () => [],
+    shippingOptionsLoading: false,
   },
 )
 
@@ -133,6 +172,8 @@ const formRef = ref<FormInstance>()
 
 function emptyForm(): OrderFormState {
   return {
+    shippingMethod: undefined,
+    recipientCountry: undefined,
     customerName: '',
     customerPhone: '',
     productName: '',
@@ -144,7 +185,39 @@ function emptyForm(): OrderFormState {
 
 const form = reactive<OrderFormState>(emptyForm())
 
+const shippingMethodOptions = computed(() =>
+  props.shippingOptions.map((method) => ({
+    value: method.code,
+    label: `${method.name} (${method.code})`,
+  })),
+)
+
+const selectedShippingMethod = computed(() =>
+  props.shippingOptions.find((method) => method.code === form.shippingMethod),
+)
+
+const countryOptions = computed(() => {
+  const method = selectedShippingMethod.value
+  if (!method) return []
+
+  const allowed = new Set(method.countryCodes)
+  const countries = method.allCountries
+    ? COUNTRY_OPTIONS
+    : COUNTRY_OPTIONS.filter((country) => allowed.has(country.code))
+
+  return countries.map((country) => ({
+    value: country.code,
+    label: `${country.name} (${country.code})`,
+  }))
+})
+
 const rules: Record<string, Rule[]> = {
+  shippingMethod: [
+    { required: true, message: '请选择运输方式', trigger: 'change' },
+  ],
+  recipientCountry: [
+    { required: true, message: '请选择收件国家', trigger: 'change' },
+  ],
   customerName: [
     { required: true, message: '请输入客户姓名', trigger: 'blur' },
   ],
@@ -190,6 +263,11 @@ function resetForm() {
   nextTick(() => formRef.value?.clearValidate())
 }
 
+function handleShippingMethodChange() {
+  form.recipientCountry = undefined
+  nextTick(() => formRef.value?.clearValidate('recipientCountry'))
+}
+
 watch(
   () => props.open,
   (open) => {
@@ -206,9 +284,18 @@ async function handleOk() {
     return
   }
 
-  if (form.quantity == null || form.unitPrice == null) return
+  if (
+    !form.shippingMethod ||
+    !form.recipientCountry ||
+    form.quantity == null ||
+    form.unitPrice == null
+  ) {
+    return
+  }
 
   emit('submit', {
+    shippingMethod: form.shippingMethod,
+    recipientCountry: form.recipientCountry,
     customerName: form.customerName.trim(),
     customerPhone: form.customerPhone.trim(),
     productName: form.productName.trim(),

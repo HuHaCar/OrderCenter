@@ -37,6 +37,17 @@
       row-key="id"
       empty-text="暂无订单，试试调整筛选条件"
     >
+      <template #cell-shipping="{ row }">
+        <div class="shipping-cell">
+          <span class="shipping-cell__method">
+            {{ row.shippingMethodLabel || row.shippingMethod }}
+          </span>
+          <span class="shipping-cell__country">
+            {{ getCountryName(row.recipientCountry) }}
+          </span>
+        </div>
+      </template>
+
       <template #cell-totalAmount="{ row }">
         <span class="order-amount">¥ {{ formatCurrency(row.totalAmount) }}</span>
       </template>
@@ -73,6 +84,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
+import { getCountryName } from '@/constants/countries'
 import { ORDER_STATUS_META } from '@/constants/order'
 import { useOrderStore } from '@/stores/order'
 import type {
@@ -221,6 +233,27 @@ watch(() => orderStore.refreshToken, loadOrders, { immediate: true })
 
 .business-table-card__alert {
   margin-bottom: 14px;
+}
+
+.shipping-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.shipping-cell__method {
+  overflow: hidden;
+  color: #2c3648;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shipping-cell__country {
+  color: #8a96a8;
+  font-size: 11.5px;
 }
 
 .order-amount {

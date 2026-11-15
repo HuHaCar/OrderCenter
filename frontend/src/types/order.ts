@@ -3,6 +3,9 @@ export type OrderStatus = 'T' | 'S' | 'R' | 'D' | 'F' | 'V' | 'P' | 'C' | 'Q'
 export interface Order {
   id: number
   orderNo: string
+  shippingMethod: string
+  shippingMethodLabel: string
+  recipientCountry: string
   customerName: string
   customerPhone: string
   productName: string
@@ -35,10 +38,19 @@ export interface OrderFilters {
 }
 
 export interface CreateOrderPayload {
+  shippingMethod: string
+  recipientCountry: string
   customerName: string
   customerPhone: string
   productName: string
   quantity: number
   unitPrice: number
   remark?: string
+}
+
+export interface ShippingOption {
+  code: string
+  name: string
+  allCountries: boolean
+  countryCodes: string[]
 }

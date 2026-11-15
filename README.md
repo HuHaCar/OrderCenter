@@ -212,6 +212,7 @@ docker compose -f docker-compose.dev.yml down -v
   - `V2__seed_orders.sql`：基础演示数据 80 条
   - `V3__seed_more_orders.sql`：扩充 270 条，共 350 条
   - `V4__change_order_status_codes.sql`：旧状态迁移为单字母 code
+  - `V5__add_shipping_fields.sql`：新增运输方式、收件国家字段，旧数据默认 `THZXR` / `CN`
 
 修改表结构时新增 `V3__*.sql`，不要改已经执行过的脚本。
 
@@ -234,6 +235,15 @@ docker compose -f docker-compose.dev.yml down -v
 - `C 已删除` 由列表删除动作直接设置，不作为普通流转目标
 - 历史状态映射：`PENDING→T`、`PAID→S`、`SHIPPED→D`、`COMPLETED→V`、`CANCELLED→C`
 
+## 运输方式与收件国家
+
+- 运输方式与可到国家覆盖关系固定，由后端 `ShippingMethodCatalog` 维护
+- 前端首次打开新增订单弹窗时请求一次 `GET /api/shippingOptions`，之后本地联动
+- 国家使用 ISO 3166-1 alpha-2 二字码，前端展示中文名称
+- 新订单必须选择运输方式和收件国家，弹窗不预选
+- 后端创建订单时再次校验运输方式与国家是否匹配
+- 老订单默认补为运输方式 `THZXR`、收件国家 `CN`
+
 ## 接口约定
 
 所有接口统一返回：
@@ -247,11 +257,14 @@ docker compose -f docker-compose.dev.yml down -v
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
 | POST | `/api/createOrder` | 新增订单 |
+| GET | `/api/shippingOptions` | 查询运输方式及可到国家 |
 
 新增订单请求示例：
 
 ```json
 {
+  "shippingMethod": "THZXR",
+  "recipientCountry": "CN",
   "customerName": "张伟",
   "customerPhone": "13800000000",
   "productName": "格瑞维亚 2027款 尊贵版",

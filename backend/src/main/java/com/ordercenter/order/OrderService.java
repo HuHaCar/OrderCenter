@@ -3,6 +3,7 @@ package com.ordercenter.order;
 import com.ordercenter.common.PageResult;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
+import com.ordercenter.shipping.ShippingMethodCatalog;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,9 +29,11 @@ public class OrderService {
     private static final int MAX_PAGE_SIZE = 200;
 
     private final OrderRepository orderRepository;
+    private final ShippingMethodCatalog shippingMethodCatalog;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository, ShippingMethodCatalog shippingMethodCatalog) {
         this.orderRepository = orderRepository;
+        this.shippingMethodCatalog = shippingMethodCatalog;
     }
 
     public PageResult<OrderResponse> page(int page, int size, String keyword, OrderStatus status) {
@@ -65,7 +68,10 @@ public class OrderService {
         );
 
         List<OrderResponse> records = result.getContent().stream()
-                .map(OrderResponse::from)
+                .map(order -> OrderResponse.from(
+                        order,
+                        shippingMethodCatalog.labelOf(order.getShippingMethod())
+                ))
                 .toList();
 
         return new PageResult<>(records, result.getTotalElements(), safePage, safeSize);
@@ -77,8 +83,12 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse create(CreateOrderRequest request) {
+        shippingMethodCatalog.validate(request.shippingMethod(), request.recipientCountry());
+
         Order order = new Order();
         order.setOrderNo(generateOrderNo());
+        order.setShippingMethod(request.shippingMethod().trim().toUpperCase(Locale.ROOT));
+        order.setRecipientCountry(request.recipientCountry().trim().toUpperCase(Locale.ROOT));
         order.setCustomerName(request.customerName().trim());
         order.setCustomerPhone(request.customerPhone().trim());
         order.setProductName(request.productName().trim());
@@ -93,7 +103,7 @@ public class OrderService {
         order.setRemark(StringUtils.hasText(request.remark()) ? request.remark().trim() : null);
 
         Order saved = orderRepository.save(order);
-        return OrderResponse.from(saved);
+        return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
     private String generateOrderNo() {

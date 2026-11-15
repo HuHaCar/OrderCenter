@@ -17,6 +17,14 @@ import java.math.BigDecimal;
  */
 public record CreateOrderRequest(
 
+        @NotBlank(message = "请选择运输方式")
+        @Size(max = 20, message = "运输方式代码不能超过 20 个字符")
+        String shippingMethod,
+
+        @NotBlank(message = "请选择收件国家")
+        @Pattern(regexp = "^[A-Z]{2}$", message = "收件国家必须是二字 ISO 国家码")
+        String recipientCountry,
+
         @NotBlank(message = "客户姓名不能为空")
         @Size(max = 50, message = "客户姓名不能超过 50 个字符")
         String customerName,
