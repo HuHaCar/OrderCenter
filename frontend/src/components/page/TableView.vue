@@ -11,6 +11,7 @@
       @forecast="emit('forecast', $event)"
       @edit="emit('edit', $event)"
       @delete="emit('delete', $event)"
+      @logs="emit('logs', $event)"
       @selection-change="emit('selection-change', $event)"
     >
       <template #toolbar>
@@ -41,6 +42,7 @@ const emit = defineEmits<{
   (event: 'forecast', order: Order): void
   (event: 'edit', order: Order): void
   (event: 'delete', order: Order): void
+  (event: 'logs', order: Order): void
   (event: 'selection-change', ids: number[]): void
 }>()
 </script>

@@ -5,6 +5,8 @@ import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import com.ordercenter.order.dto.UpdateOrderRequest;
+import com.ordercenter.order.log.OrderLogAction;
+import com.ordercenter.order.log.OrderLogService;
 import com.ordercenter.shipping.ShippingMethodCatalog;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -32,10 +34,16 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ShippingMethodCatalog shippingMethodCatalog;
+    private final OrderLogService orderLogService;
 
-    public OrderService(OrderRepository orderRepository, ShippingMethodCatalog shippingMethodCatalog) {
+    public OrderService(
+            OrderRepository orderRepository,
+            ShippingMethodCatalog shippingMethodCatalog,
+            OrderLogService orderLogService
+    ) {
         this.orderRepository = orderRepository;
         this.shippingMethodCatalog = shippingMethodCatalog;
+        this.orderLogService = orderLogService;
     }
 
     public PageResult<OrderResponse> page(int page, int size, String keyword, OrderStatus status) {
@@ -69,7 +77,10 @@ public class OrderService {
 
         Page<Order> result = orderRepository.findAll(
                 specification,
-                PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+                PageRequest.of(safePage - 1, safeSize, Sort.by(
+                        Sort.Order.desc("updatedAt"),
+                        Sort.Order.desc("createdAt")
+                ))
         );
 
         List<OrderResponse> records = result.getContent().stream()
@@ -108,6 +119,8 @@ public class OrderService {
         order.setRemark(StringUtils.hasText(request.remark()) ? request.remark().trim() : null);
 
         Order saved = orderRepository.save(order);
+        orderLogService.record(saved, OrderLogAction.CREATE,
+                "创建订单，状态：" + saved.getStatus().getLabel());
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -138,6 +151,7 @@ public class OrderService {
         order.setStatus(OrderStatus.DRAFT);
 
         Order saved = orderRepository.save(order);
+        orderLogService.record(saved, OrderLogAction.DRAFT, "保存草稿");
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -153,6 +167,7 @@ public class OrderService {
             throw new IllegalArgumentException("当前订单状态不允许编辑");
         }
 
+        OrderStatus beforeStatus = order.getStatus();
         shippingMethodCatalog.validate(request.shippingMethod(), request.recipientCountry());
 
         String shippingMethod = request.shippingMethod().trim().toUpperCase(Locale.ROOT);
@@ -179,6 +194,11 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
+        String updateDescription = saved.getStatus() == beforeStatus
+                ? "编辑订单"
+                : "编辑订单，物流信息变更，状态：" + beforeStatus.getLabel()
+                    + " → " + saved.getStatus().getLabel();
+        orderLogService.record(saved, OrderLogAction.UPDATE, updateDescription);
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -196,6 +216,9 @@ public class OrderService {
         order.setStatus(OrderStatus.FORECAST);
 
         Order saved = orderRepository.save(order);
+        orderLogService.record(saved, OrderLogAction.FORECAST,
+                "预报订单，状态：" + OrderStatus.DRAFT.getLabel()
+                    + " → " + saved.getStatus().getLabel());
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -216,8 +239,14 @@ public class OrderService {
             throw new IllegalArgumentException("选中的订单中包含不可删除的订单");
         }
 
-        orders.forEach(order -> order.setStatus(OrderStatus.DELETED));
-        orderRepository.saveAll(orders);
+        for (Order order : orders) {
+            OrderStatus beforeStatus = order.getStatus();
+            order.setStatus(OrderStatus.DELETED);
+            orderRepository.save(order);
+            orderLogService.record(order, OrderLogAction.DELETE,
+                    "删除订单，状态：" + beforeStatus.getLabel()
+                        + " → " + OrderStatus.DELETED.getLabel());
+        }
         return orders.size();
     }
 

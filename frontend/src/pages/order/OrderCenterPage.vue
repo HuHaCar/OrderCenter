@@ -6,6 +6,7 @@
     @forecast="openForecastConfirm"
     @edit="openEditOrder"
     @delete="openDeleteConfirm"
+    @logs="openLogModal"
     @selection-change="handleSelectionChange"
   >
     <template #filters>
@@ -99,6 +100,13 @@
     @submit="handleUpdateOrder"
   />
 
+  <OrderLogModal
+    :open="logModal.state.visible"
+    :order="logOrder"
+    :fetch-api="getOrderLogs"
+    @update:open="logModal.close"
+  />
+
   <BaseModal
     :open="deleteConfirm.state.visible"
     title="确认删除"
@@ -151,7 +159,8 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
-import { createDraftOrder, createOrder, deleteOrders, forecastOrder, getOrderList, getShippingOptions, updateOrder } from '@/api/order'
+import OrderLogModal from '@/components/business/OrderLogModal.vue'
+import { createDraftOrder, createOrder, deleteOrders, forecastOrder, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
@@ -178,6 +187,8 @@ interface DeleteTarget {
 }
 const deleteConfirm = useModal<DeleteTarget>()
 const deleteTarget = deleteConfirm.data
+const logModal = useModal<Order>()
+const logOrder = logModal.data
 let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
@@ -197,7 +208,7 @@ const orderColumns: BaseTableColumn[] = [
   { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 120, align: 'right' },
   { key: 'status', field: 'status', title: '状态', width: 90, align: 'center' },
   { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 140 },
-  { key: 'actions', field: 'id', title: '操作', width: 180, align: 'center', fixed: 'right' },
+  { key: 'actions', field: 'id', title: '操作', width: 220, align: 'center', fixed: 'right' },
 ]
 
 /**
@@ -285,7 +296,7 @@ async function handleUpdateOrder(payload: CreateOrderPayload) {
         ? '订单已修改并退回草稿'
         : '订单修改成功',
     )
-    orderStore.refresh()
+    orderStore.search()
   } catch (error) {
     editModal.setLoading(false)
     message.error(error instanceof Error ? error.message : '修改订单失败')
@@ -306,7 +317,7 @@ async function handleConfirmForecast() {
     forecastConfirm.setLoading(false)
     forecastConfirm.close()
     message.success(`订单 ${order.orderNo} 已预报`)
-    orderStore.refresh()
+    orderStore.search()
   } catch (error) {
     forecastConfirm.setLoading(false)
     message.error(error instanceof Error ? error.message : '预报订单失败')
@@ -315,6 +326,10 @@ async function handleConfirmForecast() {
 
 function handleSelectionChange(ids: number[]) {
   selectedOrderIds.value = ids
+}
+
+function openLogModal(order: Order) {
+  logModal.open(order)
 }
 
 function openDeleteConfirm(order: Order) {

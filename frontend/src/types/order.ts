@@ -65,3 +65,12 @@ export interface CreateDraftPayload {
   unitPrice?: number
   remark?: string
 }
+
+export interface OrderLog {
+  id: number
+  action: string
+  actionLabel: string
+  description: string
+  operator: string
+  createdAt: string
+}

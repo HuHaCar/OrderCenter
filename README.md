@@ -7,7 +7,7 @@
 - 当前里程碑：跑通「数据库 → 后端接口 → 前端分层组件 → 路由页面」的订单列表与新增订单链路
 - 演示数据：350 条订单
 
-> 当前包含订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除。
+> 当前包含订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除、操作日志。
 
 ![订单中心运行界面](docs/order-center.png)
 
@@ -214,8 +214,10 @@ docker compose -f docker-compose.dev.yml down -v
   - `V4__change_order_status_codes.sql`：旧状态迁移为单字母 code
   - `V5__add_shipping_fields.sql`：新增运输方式、收件国家字段，旧数据默认 `THZXR` / `CN`
   - `V6__allow_draft_order_fields.sql`：允许草稿订单的客户、商品、数量、金额为空
+  - `V7__create_order_operation_logs.sql`：新增订单操作日志表
+  - `V8__index_orders_updated_at.sql`：为列表的最近操作时间排序增加 `updated_at` 索引
 
-修改表结构时新增 `V3__*.sql`，不要改已经执行过的脚本。
+修改表结构时新增下一个版本号 `V9__*.sql`，不要改已经执行过的脚本。
 
 ## 订单状态
 
@@ -236,6 +238,15 @@ docker compose -f docker-compose.dev.yml down -v
 - `C 已删除` 由列表删除动作直接设置，不作为普通流转目标
 - 历史状态映射：`PENDING→T`、`PAID→S`、`SHIPPED→D`、`COMPLETED→V`、`CANCELLED→C`
 
+## 操作日志
+
+- 创建、保存草稿、预报、编辑、删除订单时自动写入 `order_operation_logs`
+- 每条记录包含操作类型、描述、操作人、时间
+- 日志查询接口：`POST /api/queryOrderLogs`，请求体 `{ "orderId": 123 }`
+- 前端操作列提供“日志”按钮，使用弹窗时间线展示，最新记录在前
+- 当前没有登录体系，操作人暂固定为“管理员”
+- 历史订单在日志功能上线前没有记录，会显示空状态
+
 ## 订单操作规则
 
 - **预报**：仅 `T 草稿` 可操作，点击后先弹出确认框；订单信息必须完整；成功后变为 `S 已预报`
@@ -246,6 +257,7 @@ docker compose -f docker-compose.dev.yml down -v
 - 列表支持多选，只有草稿/已预报行可勾选；批量删除按钮显示已选数量
 - 默认列表隐藏 `C 已删除`，状态筛选选择“已删除”时才会显示
 - 操作列固定在表格右侧
+- **日志**：所有状态的订单都可查看操作日志，点击后弹窗展示创建、草稿、预报、编辑、删除记录
 
 ## 草稿订单
 
@@ -300,6 +312,8 @@ docker compose -f docker-compose.dev.yml down -v
 ```
 
 订单号、总金额、初始状态由后端生成，前端不要传 `orderNo`、`totalAmount`、`status`。
+
+列表默认按 `updatedAt` 倒序（最近操作的订单在前），创建、预报、编辑成功后前端会回到第 1 页。
 
 `page` 从 1 开始，`size` 最大 200。`status` 可选值：
 

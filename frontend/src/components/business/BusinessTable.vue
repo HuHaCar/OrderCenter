@@ -95,6 +95,13 @@
           >
             删除
           </a-button>
+          <a-button
+            type="link"
+            size="small"
+            @click="emit('logs', row)"
+          >
+            日志
+          </a-button>
         </div>
       </template>
     </BaseTable>
@@ -147,6 +154,7 @@ const emit = defineEmits<{
   (event: 'forecast', order: Order): void
   (event: 'edit', order: Order): void
   (event: 'delete', order: Order): void
+  (event: 'logs', order: Order): void
   (event: 'selection-change', ids: number[]): void
 }>()
 

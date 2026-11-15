@@ -1,4 +1,4 @@
-import type { CreateDraftPayload, CreateOrderPayload, Order, OrderQuery, PageResult, ShippingOption } from '@/types/order'
+import type { CreateDraftPayload, CreateOrderPayload, Order, OrderLog, OrderQuery, PageResult, ShippingOption } from '@/types/order'
 import http, { unwrap } from './http'
 
 /**
@@ -27,6 +27,10 @@ export function deleteOrders(ids: number[]): Promise<number> {
 
 export function createDraftOrder(payload: CreateDraftPayload): Promise<Order> {
   return unwrap<Order>(http.post('/createDraftOrder', payload))
+}
+
+export function getOrderLogs(orderId: number): Promise<OrderLog[]> {
+  return unwrap<OrderLog[]>(http.post('/queryOrderLogs', { orderId }))
 }
 
 export function getShippingOptions(): Promise<ShippingOption[]> {
