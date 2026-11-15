@@ -36,6 +36,9 @@
       :height="tableHeight"
       row-key="id"
       empty-text="暂无订单，试试调整筛选条件"
+      selectable
+      :selectable-method="canSelectRow"
+      @selection-change="handleSelectionChange"
     >
       <template #cell-shipping="{ row }">
         <div class="shipping-cell">
@@ -88,8 +91,7 @@
             type="link"
             size="small"
             danger
-            disabled
-            title="删除功能暂未开放"
+            @click="emit('delete', row)"
           >
             删除
           </a-button>
@@ -144,6 +146,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'forecast', order: Order): void
   (event: 'edit', order: Order): void
+  (event: 'delete', order: Order): void
+  (event: 'selection-change', ids: number[]): void
 }>()
 
 const orderStore = useOrderStore()
@@ -212,6 +216,7 @@ async function loadOrders() {
       serial: (currentPage - 1) * currentSize + index + 1,
     }))
     orderStore.setTotal(result.total)
+    emit('selection-change', [])
   } catch (error) {
     if (seq !== requestSeq) return
     rows.value = []
@@ -223,6 +228,14 @@ async function loadOrders() {
       orderStore.setLoading(false)
     }
   }
+}
+
+function canSelectRow({ row }: { row: Record<string, unknown> }) {
+  return row.status === 'T' || row.status === 'S'
+}
+
+function handleSelectionChange(ids: Array<string | number>) {
+  emit('selection-change', ids.map(Number))
 }
 
 function handlePageChange(page: number, size: number) {

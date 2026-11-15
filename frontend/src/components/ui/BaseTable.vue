@@ -1,5 +1,6 @@
 <template>
   <vxe-table
+    ref="tableRef"
     class="base-table"
     border="inner"
     :data="data"
@@ -9,7 +10,16 @@
     :scroll-y="{ enabled: virtual, gt: 18 }"
     :show-overflow="true"
     :empty-text="emptyText"
+    :checkbox-config="{ checkMethod: selectableMethod }"
+    @checkbox-change="emitSelection"
+    @checkbox-all="emitSelection"
   >
+    <vxe-column
+      v-if="selectable"
+      type="checkbox"
+      width="46"
+      fixed="left"
+    />
     <vxe-column
       v-for="column in columns"
       :key="column.key"
@@ -31,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { BaseTableColumn } from '@/types/table'
 import { VxeColumn, VxeTable } from 'vxe-table'
 
@@ -48,6 +59,8 @@ withDefaults(
     rowKey?: string
     virtual?: boolean
     emptyText?: string
+    selectable?: boolean
+    selectableMethod?: (params: { row: Record<string, unknown> }) => boolean
   }>(),
   {
     loading: false,
@@ -55,8 +68,20 @@ withDefaults(
     rowKey: 'id',
     virtual: true,
     emptyText: '暂无数据',
+    selectable: false,
   },
 )
+
+const emit = defineEmits<{
+  (event: 'selection-change', ids: Array<string | number>): void
+}>()
+
+const tableRef = ref()
+
+function emitSelection() {
+  const rows = tableRef.value?.getCheckboxRecords?.() ?? []
+  emit('selection-change', rows.map((row: { id: string | number }) => row.id))
+}
 
 defineOptions({ name: 'BaseTable' })
 </script>

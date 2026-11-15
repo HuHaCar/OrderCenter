@@ -5,6 +5,8 @@
     :format-result="formatOrderResult"
     @forecast="openForecastConfirm"
     @edit="openEditOrder"
+    @delete="openDeleteConfirm"
+    @selection-change="handleSelectionChange"
   >
     <template #filters>
       <div class="order-filters">
@@ -61,7 +63,15 @@
 
     <template #batch-actions>
       <a-space class="batch-actions" :size="8">
-        <a-button size="small" disabled title="下一阶段接入">批量删除</a-button>
+        <span class="batch-actions__label">已选 {{ selectedOrderIds.length }} 项</span>
+        <a-button
+          size="small"
+          danger
+          :disabled="!selectedOrderIds.length"
+          @click="openBatchDeleteConfirm"
+        >
+          批量删除
+        </a-button>
         <a-button size="small" disabled title="下一阶段接入">导出订单</a-button>
       </a-space>
     </template>
@@ -88,6 +98,26 @@
     @update:open="editModal.close"
     @submit="handleUpdateOrder"
   />
+
+  <BaseModal
+    :open="deleteConfirm.state.visible"
+    title="确认删除"
+    width="420px"
+    ok-text="确认删除"
+    cancel-text="取消"
+    :confirm-loading="deleteConfirm.state.loading"
+    :cancel-button-props="{ disabled: deleteConfirm.state.loading }"
+    :closable="!deleteConfirm.state.loading"
+    @ok="handleConfirmDelete"
+    @cancel="deleteConfirm.close"
+  >
+    <div class="delete-confirm">
+      <p>确定要删除 <strong>{{ deleteTarget?.label }}</strong> 吗？</p>
+      <p class="delete-confirm__hint">
+        删除后订单状态将变为“已删除”，并从默认列表隐藏。
+      </p>
+    </div>
+  </BaseModal>
 
   <BaseModal
     :open="forecastConfirm.state.visible"
@@ -121,7 +151,7 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
-import { createDraftOrder, createOrder, forecastOrder, getOrderList, getShippingOptions, updateOrder } from '@/api/order'
+import { createDraftOrder, createOrder, deleteOrders, forecastOrder, getOrderList, getShippingOptions, updateOrder } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
@@ -141,6 +171,13 @@ const shippingOptionsLoading = ref(false)
 const draftSaving = ref(false)
 const forecastConfirm = useModal<Order>()
 const forecastTarget = forecastConfirm.data
+const selectedOrderIds = ref<number[]>([])
+interface DeleteTarget {
+  ids: number[]
+  label: string
+}
+const deleteConfirm = useModal<DeleteTarget>()
+const deleteTarget = deleteConfirm.data
 let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
@@ -275,6 +312,43 @@ async function handleConfirmForecast() {
     message.error(error instanceof Error ? error.message : '预报订单失败')
   }
 }
+
+function handleSelectionChange(ids: number[]) {
+  selectedOrderIds.value = ids
+}
+
+function openDeleteConfirm(order: Order) {
+  deleteConfirm.open({
+    ids: [order.id],
+    label: `订单 ${order.orderNo}`,
+  })
+}
+
+function openBatchDeleteConfirm() {
+  if (!selectedOrderIds.value.length) return
+  deleteConfirm.open({
+    ids: [...selectedOrderIds.value],
+    label: `选中的 ${selectedOrderIds.value.length} 个订单`,
+  })
+}
+
+async function handleConfirmDelete() {
+  const target = deleteTarget.value
+  if (!target) return
+
+  deleteConfirm.setLoading(true)
+  try {
+    const deleted = await deleteOrders(target.ids)
+    deleteConfirm.setLoading(false)
+    deleteConfirm.close()
+    selectedOrderIds.value = []
+    message.success(`已删除 ${deleted} 个订单`)
+    orderStore.refresh()
+  } catch (error) {
+    deleteConfirm.setLoading(false)
+    message.error(error instanceof Error ? error.message : '删除订单失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -317,6 +391,28 @@ async function handleConfirmForecast() {
 }
 
 .batch-actions__label {
+  color: #98a3b3;
+  font-size: 12px;
+}
+
+.delete-confirm {
+  padding: 4px 0 2px;
+  color: #4b5567;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.delete-confirm p {
+  margin: 0;
+}
+
+.delete-confirm strong {
+  color: #162033;
+  font-weight: 600;
+}
+
+.delete-confirm__hint {
+  margin-top: 6px !important;
   color: #98a3b3;
   font-size: 12px;
 }

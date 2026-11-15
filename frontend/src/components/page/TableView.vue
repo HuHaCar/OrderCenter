@@ -10,6 +10,8 @@
       :format-result="formatResult"
       @forecast="emit('forecast', $event)"
       @edit="emit('edit', $event)"
+      @delete="emit('delete', $event)"
+      @selection-change="emit('selection-change', $event)"
     >
       <template #toolbar>
         <slot name="batch-actions" />
@@ -38,6 +40,8 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'forecast', order: Order): void
   (event: 'edit', order: Order): void
+  (event: 'delete', order: Order): void
+  (event: 'selection-change', ids: number[]): void
 }>()
 </script>
 

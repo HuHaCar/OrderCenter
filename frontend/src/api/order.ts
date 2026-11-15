@@ -21,6 +21,10 @@ export function forecastOrder(id: number): Promise<Order> {
   return unwrap<Order>(http.post('/forecastOrder', { id }))
 }
 
+export function deleteOrders(ids: number[]): Promise<number> {
+  return unwrap<number>(http.post('/deleteOrders', { ids }))
+}
+
 export function createDraftOrder(payload: CreateDraftPayload): Promise<Order> {
   return unwrap<Order>(http.post('/createDraftOrder', payload))
 }

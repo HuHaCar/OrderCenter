@@ -57,6 +57,9 @@ public class OrderService {
 
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
+            } else {
+                // 默认列表不展示软删除订单；显式筛选 C 时才显示
+                predicates.add(cb.notEqual(root.get("status"), OrderStatus.DELETED));
             }
 
             return predicates.isEmpty()
@@ -194,6 +197,28 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
+    }
+
+    /**
+     * 批量删除，单行删除复用同一个接口。
+     * 只做软删除，且选中的订单必须全部处于可删除状态。
+     */
+    @Transactional
+    public int deleteOrders(List<Long> ids) {
+        List<Long> distinctIds = ids.stream().distinct().toList();
+        List<Order> orders = orderRepository.findAllById(distinctIds);
+
+        if (orders.size() != distinctIds.size()) {
+            throw new IllegalArgumentException("部分订单不存在，请刷新后重试");
+        }
+
+        if (orders.stream().anyMatch(order -> !order.getStatus().isDeletable())) {
+            throw new IllegalArgumentException("选中的订单中包含不可删除的订单");
+        }
+
+        orders.forEach(order -> order.setStatus(OrderStatus.DELETED));
+        orderRepository.saveAll(orders);
+        return orders.size();
     }
 
     private Order requireOrder(Long id) {

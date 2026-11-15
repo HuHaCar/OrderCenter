@@ -4,6 +4,7 @@ import com.ordercenter.common.ApiResponse;
 import com.ordercenter.common.PageResult;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
+import com.ordercenter.order.dto.DeleteOrdersRequest;
 import com.ordercenter.order.dto.ForecastOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
 import com.ordercenter.order.dto.UpdateOrderRequest;
@@ -84,5 +85,11 @@ public class OrderController {
     @PostMapping("/forecastOrder")
     public ApiResponse<OrderResponse> forecast(@Valid @RequestBody ForecastOrderRequest request) {
         return ApiResponse.ok(orderService.forecast(request.id()));
+    }
+
+    @Operation(summary = "批量删除订单（单行删除也复用）")
+    @PostMapping("/deleteOrders")
+    public ApiResponse<Integer> deleteOrders(@Valid @RequestBody DeleteOrdersRequest request) {
+        return ApiResponse.ok(orderService.deleteOrders(request.ids()));
     }
 }
