@@ -246,7 +246,7 @@ function handleMenuClick({ key }: { key: string }) {
 
 .admin-content {
   min-width: 0;
-  padding: 26px 28px 40px;
+  padding: 16px;
 }
 
 @media (max-width: 900px) {
@@ -263,7 +263,7 @@ function handleMenuClick({ key }: { key: string }) {
   }
 
   .admin-content {
-    padding: 18px 14px 30px;
+    padding: 16px;
   }
 }
 </style>

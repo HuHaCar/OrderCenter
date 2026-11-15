@@ -236,6 +236,15 @@ docker compose -f docker-compose.dev.yml down -v
 - `C 已删除` 由列表删除动作直接设置，不作为普通流转目标
 - 历史状态映射：`PENDING→T`、`PAID→S`、`SHIPPED→D`、`COMPLETED→V`、`CANCELLED→C`
 
+## 订单操作规则
+
+- **预报**：仅 `T 草稿` 可操作，点击后先弹出确认框；订单信息必须完整；成功后变为 `S 已预报`
+- **编辑**：仅 `T 草稿`、`S 已预报` 可操作；接口为 `POST /api/updateOrder`，订单 id 放在请求体
+  - 编辑不改变订单号
+  - 已预报订单如果修改运输方式或收件国家，会自动退回 `T 草稿`，需要重新预报
+- **删除**：当前只展示按钮，暂未接入后端
+- 操作列固定在表格右侧
+
 ## 草稿订单
 
 - 新订单弹窗提供“保存草稿”和“保存订单”两个操作
@@ -269,6 +278,8 @@ docker compose -f docker-compose.dev.yml down -v
 | GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
 | POST | `/api/createOrder` | 新增订单 |
 | POST | `/api/createDraftOrder` | 保存订单草稿（仅运输方式 + 收件国家） |
+| POST | `/api/updateOrder` | 编辑订单（id 放在请求体，订单号不变） |
+| POST | `/api/forecastOrder` | 预报订单（请求体传 `{ id }`，仅草稿） |
 | GET | `/api/shippingOptions` | 查询运输方式及可到国家 |
 
 新增订单请求示例：

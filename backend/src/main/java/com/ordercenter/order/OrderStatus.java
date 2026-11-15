@@ -83,4 +83,19 @@ public enum OrderStatus {
     public boolean canTransitionTo(OrderStatus next) {
         return next != null && nextStatuses().contains(next);
     }
+
+    /** 只有草稿可以执行预报操作。 */
+    public boolean isForecastable() {
+        return this == DRAFT;
+    }
+
+    /** 只有草稿和已预报订单允许编辑。 */
+    public boolean isEditable() {
+        return this == DRAFT || this == FORECAST;
+    }
+
+    /** 删除功能暂未开放，规则先约定：草稿和已预报可删除。 */
+    public boolean isDeletable() {
+        return this == DRAFT || this == FORECAST;
+    }
 }

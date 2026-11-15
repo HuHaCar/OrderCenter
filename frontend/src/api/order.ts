@@ -13,6 +13,14 @@ export function createOrder(payload: CreateOrderPayload): Promise<Order> {
   return unwrap<Order>(http.post('/createOrder', payload))
 }
 
+export function updateOrder(id: number, payload: CreateOrderPayload): Promise<Order> {
+  return unwrap<Order>(http.post('/updateOrder', { id, ...payload }))
+}
+
+export function forecastOrder(id: number): Promise<Order> {
+  return unwrap<Order>(http.post('/forecastOrder', { id }))
+}
+
 export function createDraftOrder(payload: CreateDraftPayload): Promise<Order> {
   return unwrap<Order>(http.post('/createDraftOrder', payload))
 }

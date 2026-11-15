@@ -64,6 +64,37 @@
       <template #cell-createdAt="{ row }">
         <span class="order-time">{{ formatDateTime(row.createdAt) }}</span>
       </template>
+
+      <template #cell-actions="{ row }">
+        <div class="row-actions">
+          <a-button
+            v-if="row.status === 'T'"
+            type="link"
+            size="small"
+            @click="emit('forecast', row)"
+          >
+            预报
+          </a-button>
+          <a-button
+            v-if="row.status === 'T' || row.status === 'S'"
+            type="link"
+            size="small"
+            @click="emit('edit', row)"
+          >
+            编辑
+          </a-button>
+          <a-button
+            v-if="row.status === 'T' || row.status === 'S'"
+            type="link"
+            size="small"
+            danger
+            disabled
+            title="删除功能暂未开放"
+          >
+            删除
+          </a-button>
+        </div>
+      </template>
     </BaseTable>
 
     <div class="business-table-card__footer">
@@ -108,6 +139,11 @@ const props = defineProps<{
   fetchApi: (query: OrderQuery) => Promise<unknown>
   columns: BaseTableColumn[]
   formatResult?: TableResultFormatter<Order>
+}>()
+
+const emit = defineEmits<{
+  (event: 'forecast', order: Order): void
+  (event: 'edit', order: Order): void
 }>()
 
 const orderStore = useOrderStore()
@@ -236,6 +272,17 @@ watch(() => orderStore.refreshToken, loadOrders, { immediate: true })
 
 .business-table-card__alert {
   margin-bottom: 14px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.row-actions :deep(.ant-btn) {
+  padding: 0 6px;
 }
 
 .shipping-cell {

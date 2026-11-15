@@ -8,6 +8,8 @@
       :fetch-api="fetchApi"
       :columns="columns"
       :format-result="formatResult"
+      @forecast="emit('forecast', $event)"
+      @edit="emit('edit', $event)"
     >
       <template #toolbar>
         <slot name="batch-actions" />
@@ -32,6 +34,11 @@ defineProps<{
   columns: BaseTableColumn[]
   formatResult?: TableResultFormatter<Order>
 }>()
+
+const emit = defineEmits<{
+  (event: 'forecast', order: Order): void
+  (event: 'edit', order: Order): void
+}>()
 </script>
 
 <style scoped>
@@ -41,7 +48,7 @@ defineProps<{
 }
 
 .table-view__filter-card {
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   border-radius: 14px;
   box-shadow: 0 8px 30px rgba(32, 51, 84, 0.06);
 }

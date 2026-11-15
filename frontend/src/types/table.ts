@@ -7,6 +7,7 @@ export interface BaseTableColumn {
   width?: number | string
   minWidth?: number | string
   align?: TableAlign
+  fixed?: 'left' | 'right'
   ellipsis?: boolean
   formatter?: (value: unknown, row: Record<string, unknown>) => string
 }

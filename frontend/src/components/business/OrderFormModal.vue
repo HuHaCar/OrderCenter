@@ -1,7 +1,7 @@
 <template>
   <BaseModal
     :open="open"
-    title="新增订单"
+    :title="isEdit ? '编辑订单' : '新增订单'"
     width="640px"
     :closable="!loading && !draftLoading"
     @cancel="handleCancel"
@@ -129,6 +129,7 @@
           取消
         </a-button>
         <a-button
+          v-if="!isEdit"
           :loading="draftLoading"
           :disabled="loading"
           @click="handleSaveDraft"
@@ -141,7 +142,7 @@
           :disabled="draftLoading"
           @click="handleOk"
         >
-          保存订单
+          {{ isEdit ? '保存修改' : '保存订单' }}
         </a-button>
       </div>
     </template>
@@ -157,6 +158,7 @@ import { formatCurrency } from '@/utils/format'
 import type {
   CreateDraftPayload,
   CreateOrderPayload,
+  Order,
   ShippingOption,
 } from '@/types/order'
 
@@ -176,16 +178,22 @@ const props = withDefaults(
     open: boolean
     loading?: boolean
     draftLoading?: boolean
+    mode?: 'create' | 'edit'
+    order?: Order | null
     shippingOptions?: ShippingOption[]
     shippingOptionsLoading?: boolean
   }>(),
   {
     loading: false,
     draftLoading: false,
+    mode: 'create',
+    order: null,
     shippingOptions: () => [],
     shippingOptionsLoading: false,
   },
 )
+
+const isEdit = computed(() => props.mode === 'edit')
 
 const emit = defineEmits<{
   (event: 'update:open', value: boolean): void
@@ -293,10 +301,29 @@ function handleShippingMethodChange() {
   nextTick(() => formRef.value?.clearValidate('recipientCountry'))
 }
 
+function fillForm(order: Order) {
+  Object.assign(form, {
+    shippingMethod: order.shippingMethod,
+    recipientCountry: order.recipientCountry,
+    customerName: order.customerName ?? '',
+    customerPhone: order.customerPhone ?? '',
+    productName: order.productName ?? '',
+    quantity: order.quantity ?? null,
+    unitPrice: order.unitPrice ?? null,
+    remark: order.remark ?? '',
+  })
+  nextTick(() => formRef.value?.clearValidate())
+}
+
 watch(
-  () => props.open,
-  (open) => {
-    if (open) resetForm()
+  [() => props.open, () => props.order],
+  ([open]) => {
+    if (!open) return
+    if (isEdit.value && props.order) {
+      fillForm(props.order)
+    } else {
+      resetForm()
+    }
   },
 )
 
@@ -331,7 +358,7 @@ async function handleOk() {
 }
 
 async function handleSaveDraft() {
-  if (props.loading || props.draftLoading || !formRef.value) return
+  if (isEdit.value || props.loading || props.draftLoading || !formRef.value) return
 
   try {
     await formRef.value.validateFields(['shippingMethod', 'recipientCountry'])

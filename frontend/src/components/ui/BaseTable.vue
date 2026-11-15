@@ -18,6 +18,7 @@
       :width="column.width"
       :min-width="column.minWidth"
       :align="column.align ?? 'left'"
+      :fixed="column.fixed"
       :show-overflow="column.ellipsis ?? true"
     >
       <template #default="{ row }">

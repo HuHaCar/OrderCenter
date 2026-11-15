@@ -3,6 +3,8 @@
     :fetch-api="getOrderList"
     :columns="orderColumns"
     :format-result="formatOrderResult"
+    @forecast="openForecastConfirm"
+    @edit="openEditOrder"
   >
     <template #filters>
       <div class="order-filters">
@@ -75,6 +77,41 @@
     @submit="handleCreateOrder"
     @save-draft="handleSaveDraft"
   />
+
+  <OrderFormModal
+    mode="edit"
+    :open="editModal.state.visible"
+    :loading="editModal.state.loading"
+    :order="editingOrder"
+    :shipping-options="shippingOptions"
+    :shipping-options-loading="shippingOptionsLoading"
+    @update:open="editModal.close"
+    @submit="handleUpdateOrder"
+  />
+
+  <BaseModal
+    :open="forecastConfirm.state.visible"
+    title="确认预报"
+    width="420px"
+    ok-text="确认预报"
+    cancel-text="取消"
+    :confirm-loading="forecastConfirm.state.loading"
+    :cancel-button-props="{ disabled: forecastConfirm.state.loading }"
+    :closable="!forecastConfirm.state.loading"
+    @ok="handleConfirmForecast"
+    @cancel="forecastConfirm.close"
+  >
+    <div class="forecast-confirm">
+      <p>
+        确定要将订单
+        <strong>{{ forecastTarget?.orderNo }}</strong>
+        预报吗？
+      </p>
+      <p class="forecast-confirm__hint">
+        预报后订单状态将变为“已预报”。
+      </p>
+    </div>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
@@ -82,8 +119,9 @@ import { computed, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
-import { createDraftOrder, createOrder, getOrderList, getShippingOptions } from '@/api/order'
+import { createDraftOrder, createOrder, forecastOrder, getOrderList, getShippingOptions, updateOrder } from '@/api/order'
 import { ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
@@ -96,9 +134,13 @@ import type { CreateDraftPayload, CreateOrderPayload, Order, PageResult, Shippin
  */
 const orderStore = useOrderStore()
 const createModal = useModal()
+const editModal = useModal<Order>()
+const editingOrder = editModal.data
 const shippingOptions = ref<ShippingOption[]>([])
 const shippingOptionsLoading = ref(false)
 const draftSaving = ref(false)
+const forecastConfirm = useModal<Order>()
+const forecastTarget = forecastConfirm.data
 let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
@@ -108,16 +150,17 @@ const isResetting = computed(
 )
 
 const orderColumns: BaseTableColumn[] = [
-  { key: 'serial', field: 'serial', title: '序号', width: 70, align: 'center' },
+  { key: 'serial', field: 'serial', title: '序号', width: 60, align: 'center' },
   { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
-  { key: 'shipping', field: 'shippingMethod', title: '运输方式', width: 190 },
-  { key: 'customerName', field: 'customerName', title: '客户', width: 105 },
-  { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 135 },
-  { key: 'productName', field: 'productName', title: '商品', minWidth: 200 },
-  { key: 'quantity', field: 'quantity', title: '数量', width: 74, align: 'right' },
-  { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 130, align: 'right' },
-  { key: 'status', field: 'status', title: '状态', width: 104, align: 'center' },
-  { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 160 },
+  { key: 'shipping', field: 'shippingMethod', title: '运输方式', width: 170 },
+  { key: 'customerName', field: 'customerName', title: '客户', width: 95 },
+  { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 125 },
+  { key: 'productName', field: 'productName', title: '商品', minWidth: 150 },
+  { key: 'quantity', field: 'quantity', title: '数量', width: 64, align: 'right' },
+  { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 120, align: 'right' },
+  { key: 'status', field: 'status', title: '状态', width: 90, align: 'center' },
+  { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 140 },
+  { key: 'actions', field: 'id', title: '操作', width: 180, align: 'center', fixed: 'right' },
 ]
 
 /**
@@ -185,6 +228,53 @@ async function handleSaveDraft(payload: CreateDraftPayload) {
     message.error(error instanceof Error ? error.message : '保存草稿失败')
   }
 }
+
+function openEditOrder(order: Order) {
+  void ensureShippingOptions()
+  editModal.open(order)
+}
+
+async function handleUpdateOrder(payload: CreateOrderPayload) {
+  const order = editingOrder.value
+  if (!order) return
+
+  editModal.setLoading(true)
+  try {
+    const updated = await updateOrder(order.id, payload)
+    editModal.setLoading(false)
+    editModal.close()
+    message.success(
+      updated.status === 'T'
+        ? '订单已修改并退回草稿'
+        : '订单修改成功',
+    )
+    orderStore.refresh()
+  } catch (error) {
+    editModal.setLoading(false)
+    message.error(error instanceof Error ? error.message : '修改订单失败')
+  }
+}
+
+function openForecastConfirm(order: Order) {
+  forecastConfirm.open(order)
+}
+
+async function handleConfirmForecast() {
+  const order = forecastTarget.value
+  if (!order) return
+
+  forecastConfirm.setLoading(true)
+  try {
+    await forecastOrder(order.id)
+    forecastConfirm.setLoading(false)
+    forecastConfirm.close()
+    message.success(`订单 ${order.orderNo} 已预报`)
+    orderStore.refresh()
+  } catch (error) {
+    forecastConfirm.setLoading(false)
+    message.error(error instanceof Error ? error.message : '预报订单失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -227,6 +317,28 @@ async function handleSaveDraft(payload: CreateDraftPayload) {
 }
 
 .batch-actions__label {
+  color: #98a3b3;
+  font-size: 12px;
+}
+
+.forecast-confirm {
+  padding: 4px 0 2px;
+  color: #4b5567;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.forecast-confirm p {
+  margin: 0;
+}
+
+.forecast-confirm strong {
+  color: #162033;
+  font-weight: 600;
+}
+
+.forecast-confirm__hint {
+  margin-top: 6px !important;
   color: #98a3b3;
   font-size: 12px;
 }
