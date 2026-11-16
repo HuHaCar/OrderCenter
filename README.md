@@ -2,12 +2,12 @@
 
 一个用于学习前后端全栈协作的订单中心骨架。
 
-- 后端：Spring Boot 3.5 + Java 21 + Spring Data JPA + MySQL 8 + Flyway + Swagger + Apache POI
+- 后端：Spring Boot 3.5 + Java 21 + Spring Data JPA + MySQL 8 + Flyway + Swagger + Apache POI + Spring Security
 - 前端：Vue 3 + TypeScript + Vite + Ant Design Vue 4 + Pinia + vxe-table
 - 当前里程碑：跑通「数据库 → 后端接口 → 前端分层组件 → 路由页面」的订单列表与新增订单链路
 - 演示数据：350 条订单
 
-> 当前包含订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除、批量导出 Excel、操作日志。
+> 当前包含登录认证、订单查询、搜索、状态筛选、分页、新增/草稿、预报、编辑、单行与批量删除、批量导出 Excel、操作日志。
 
 ![订单中心运行界面](docs/order-center.png)
 
@@ -206,7 +206,7 @@ docker compose -f docker-compose.dev.yml down -v
 
 - 数据库：`order_center`
 - 用户：`order` / `order123`（默认开发配置）
-- 表：`orders`
+- 表：`orders`、`order_operation_logs`、`users`、`auth_sessions`、`auth_refresh_tokens`
 - Flyway 脚本：
   - `V1__create_orders.sql`：建表
   - `V2__seed_orders.sql`：基础演示数据 80 条
@@ -216,8 +216,9 @@ docker compose -f docker-compose.dev.yml down -v
   - `V6__allow_draft_order_fields.sql`：允许草稿订单的客户、商品、数量、金额为空
   - `V7__create_order_operation_logs.sql`：新增订单操作日志表
   - `V8__index_orders_updated_at.sql`：为列表的最近操作时间排序增加 `updated_at` 索引
+  - `V9__create_auth_tables.sql`：新增用户、登录会话、refresh token 表
 
-修改表结构时新增下一个版本号 `V9__*.sql`，不要改已经执行过的脚本。
+修改表结构时新增下一个版本号 `V10__*.sql`，不要改已经执行过的脚本。
 
 ## 订单状态
 
@@ -286,8 +287,18 @@ docker compose -f docker-compose.dev.yml down -v
 { "code": 0, "message": "ok", "data": ... }
 ```
 
+除登录、刷新、退出和健康检查外，其余接口都需要请求头：
+
+```text
+Authorization: Bearer <accessToken>
+```
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| POST | `/api/auth/login` | 登录，返回 access token，并设置 refresh Cookie |
+| POST | `/api/auth/refresh` | 用 HttpOnly refresh Cookie 换取新 access token |
+| POST | `/api/auth/logout` | 撤销当前会话并清除 refresh Cookie |
+| GET | `/api/auth/me` | 当前登录人信息 |
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/queryOrderList?page=1&size=100&keyword=&status=` | 订单分页查询 |
 | POST | `/api/createOrder` | 新增订单 |
@@ -330,9 +341,54 @@ docker compose -f docker-compose.dev.yml down -v
 
 `T` 草稿 / `S` 已预报 / `R` 已收货 / `D` 已发货 / `F` 已退件 / `V` 已签收 / `P` 已理赔 / `C` 已删除 / `Q` 弃件
 
+## 登录与认证
+
+### 默认账号
+
+系统启动时如果默认账号不存在，会自动创建：
+
+```text
+账号：admin
+密码：admin123
+展示名：系统管理员
+角色：ADMIN
+```
+
+可以通过环境变量覆盖：`AUTH_DEFAULT_USERNAME`、`AUTH_DEFAULT_PASSWORD`、`AUTH_DEFAULT_DISPLAY_NAME`。
+
+### Token 策略
+
+- access token：JWT，5 分钟过期，前端只保存在内存中。
+- refresh token：32 字节随机字符串，2 天过期，只放在 `HttpOnly` Cookie 中。
+- refresh token 数据库只保存 SHA-256 哈希，客户端原始值不可从数据库还原。
+- 每次刷新都会轮换 refresh token；旧 token 被再次使用时撤销整个会话。
+- access token 中包含 `sid`，每次请求都会检查 `auth_sessions`；退出登录后旧 access token 立即失效。
+- Cookie：`HttpOnly`、`SameSite=Lax`、`Path=/api/auth`；生产环境需要设置 `AUTH_COOKIE_SECURE=true`。
+
+### 前端 401 刷新队列
+
+- 全局维护 `isRefreshing`，同一时刻只允许一个刷新请求。
+- 第一个 401 触发 `POST /api/auth/refresh`，后续 401 进入等待队列，不再重复刷新。
+- 刷新成功后，查询类请求（列表、日志、导出等只读接口）自动使用新 access token 重放。
+- 创建、编辑、预报、删除等提交类请求不自动重放，避免网络重试造成重复提交；页面会提示“登录状态已刷新，请确认后重新提交”。
+- 刷新失败会清理登录态并跳转 `/login`。
+
+### 相关配置
+
+```yaml
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET:...}
+    access-token-ttl: 5m
+    refresh-token-ttl: 2d
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+```
+
+生产环境至少需要覆盖 `JWT_SECRET`（长度不少于 32 字节）和 `AUTH_COOKIE_SECURE=true`。
+
 ## 下一阶段
 
-1. 登录、权限与操作人
+1. 用户管理、角色权限细分、强制下线
 2. 收货、发货、签收、退件、理赔等后续状态流转与统计卡片
 3. 后端接口自动化测试
 4. 生产 Docker Compose（Nginx + Spring Boot + MySQL）

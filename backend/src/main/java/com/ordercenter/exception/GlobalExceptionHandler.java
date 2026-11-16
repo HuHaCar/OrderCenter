@@ -1,5 +1,6 @@
 package com.ordercenter.exception;
 
+import com.ordercenter.auth.RefreshTokenException;
 import com.ordercenter.common.ApiResponse;
 import com.ordercenter.order.OrderNotFoundException;
 import org.slf4j.Logger;
@@ -7,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -33,6 +35,18 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage() == null ? "参数校验失败" : error.getDefaultMessage())
                 .orElse("参数校验失败");
         return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.fail(401, exception.getMessage()));
+    }
+
+    @ExceptionHandler(RefreshTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRefreshToken(RefreshTokenException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.fail(401, exception.getMessage()));
     }
 
     @ExceptionHandler(OrderNotFoundException.class)

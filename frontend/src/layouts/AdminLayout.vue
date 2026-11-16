@@ -55,7 +55,23 @@
 
         <div class="admin-header__right">
           <span class="admin-header__env">DEV</span>
-          <a-avatar class="admin-header__avatar">OC</a-avatar>
+          <div class="admin-header__user">
+            <a-avatar class="admin-header__avatar">{{ avatarText }}</a-avatar>
+            <div class="admin-header__user-meta">
+              <span class="admin-header__user-name">{{ authStore.displayName }}</span>
+              <span class="admin-header__user-role">{{ authStore.roleLabel }}</span>
+            </div>
+            <a-button
+              type="text"
+              size="small"
+              class="admin-header__logout"
+              :loading="loggingOut"
+              @click="handleLogout"
+            >
+              <template #icon><LogoutOutlined /></template>
+              退出
+            </a-button>
+          </div>
         </div>
       </a-layout-header>
 
@@ -68,19 +84,25 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AppstoreOutlined,
+  LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const collapsed = ref(false)
+const loggingOut = ref(false)
 
+const avatarText = computed(() => authStore.displayName.slice(0, 1))
 const selectedKeys = computed(() => [route.path])
 const pageTitle = computed(() =>
   typeof route.meta.title === 'string' ? route.meta.title : '订单中心',
@@ -89,6 +111,20 @@ const pageTitle = computed(() =>
 function handleMenuClick({ key }: { key: string }) {
   if (key === '/orders') {
     router.push(key)
+  }
+}
+
+async function handleLogout() {
+  if (loggingOut.value) return
+
+  loggingOut.value = true
+  try {
+    await authStore.logout()
+    await router.replace('/login')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '退出登录失败')
+  } finally {
+    loggingOut.value = false
   }
 }
 </script>
@@ -242,6 +278,41 @@ function handleMenuClick({ key }: { key: string }) {
   background: #162033;
   color: #fff;
   font-size: 11px;
+}
+
+.admin-header__user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 4px 4px 6px;
+  border-radius: 12px;
+}
+
+.admin-header__user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 68px;
+  max-width: 140px;
+  line-height: 1.3;
+}
+
+.admin-header__user-name {
+  overflow: hidden;
+  color: #162033;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-header__user-role {
+  color: #98a3b3;
+  font-size: 10px;
+}
+
+.admin-header__logout {
+  padding-inline: 6px;
+  color: #7c889b;
 }
 
 .admin-content {
