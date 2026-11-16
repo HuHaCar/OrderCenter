@@ -54,24 +54,35 @@
         </div>
 
         <div class="admin-header__right">
-          <span class="admin-header__env">DEV</span>
-          <div class="admin-header__user">
-            <a-avatar class="admin-header__avatar">{{ avatarText }}</a-avatar>
-            <div class="admin-header__user-meta">
-              <span class="admin-header__user-name">{{ authStore.displayName }}</span>
-              <span class="admin-header__user-role">{{ authStore.roleLabel }}</span>
+          <a-popover
+            :open="userMenuOpen || loggingOut"
+            :trigger="['hover', 'click']"
+            placement="bottomRight"
+            :mouse-enter-delay="0.1"
+            :mouse-leave-delay="0.2"
+            @open-change="handleUserMenuOpenChange"
+          >
+            <template #content>
+              <a-button
+                type="text"
+                danger
+                class="admin-header__logout-option"
+                :loading="loggingOut"
+                @click="handleLogout"
+              >
+                <template #icon><LogoutOutlined /></template>
+                {{ loggingOut ? '退出中...' : '退出登录' }}
+              </a-button>
+            </template>
+
+            <div class="admin-header__user">
+              <a-avatar class="admin-header__avatar">{{ avatarText }}</a-avatar>
+              <div class="admin-header__user-meta">
+                <span class="admin-header__user-name">{{ authStore.displayName }}</span>
+                <span class="admin-header__user-role">{{ authStore.roleLabel }}</span>
+              </div>
             </div>
-            <a-button
-              type="text"
-              size="small"
-              class="admin-header__logout"
-              :loading="loggingOut"
-              @click="handleLogout"
-            >
-              <template #icon><LogoutOutlined /></template>
-              退出
-            </a-button>
-          </div>
+          </a-popover>
         </div>
       </a-layout-header>
 
@@ -101,6 +112,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const collapsed = ref(false)
 const loggingOut = ref(false)
+const userMenuOpen = ref(false)
 
 const avatarText = computed(() => authStore.displayName.slice(0, 1))
 const selectedKeys = computed(() => [route.path])
@@ -114,14 +126,24 @@ function handleMenuClick({ key }: { key: string }) {
   }
 }
 
+function handleUserMenuOpenChange(open: boolean) {
+  if (loggingOut.value) {
+    userMenuOpen.value = true
+    return
+  }
+  userMenuOpen.value = open
+}
+
 async function handleLogout() {
   if (loggingOut.value) return
 
+  userMenuOpen.value = true
   loggingOut.value = true
   try {
     await authStore.logout()
     await router.replace('/login')
   } catch (error) {
+    userMenuOpen.value = false
     message.error(error instanceof Error ? error.message : '退出登录失败')
   } finally {
     loggingOut.value = false
@@ -284,8 +306,14 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 4px 4px 4px 6px;
+  padding: 5px 8px 5px 6px;
   border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.admin-header__user:hover {
+  background: #f4f8ff;
 }
 
 .admin-header__user-meta {
@@ -310,9 +338,11 @@ async function handleLogout() {
   font-size: 10px;
 }
 
-.admin-header__logout {
-  padding-inline: 6px;
-  color: #7c889b;
+.admin-header__logout-option {
+  width: 100%;
+  justify-content: flex-start;
+  padding-inline: 8px;
+  text-align: left;
 }
 
 .admin-content {
