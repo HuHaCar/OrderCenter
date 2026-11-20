@@ -24,14 +24,18 @@
           <ShoppingCartOutlined />
           <span>订单中心</span>
         </a-menu-item>
-        <a-menu-item key="/dashboard" disabled>
+        <a-menu-item key="/sales">
+          <ShoppingCartOutlined />
+          <span>业务员</span>
+        </a-menu-item>
+        <!-- <a-menu-item key="/dashboard" disabled>
           <AppstoreOutlined />
           <span>数据看板</span>
         </a-menu-item>
         <a-menu-item key="/settings" disabled>
           <SettingOutlined />
           <span>系统设置</span>
-        </a-menu-item>
+        </a-menu-item> -->
       </a-menu>
 
       <div v-show="!collapsed" class="admin-sider__footer">
@@ -121,9 +125,9 @@ const pageTitle = computed(() =>
 )
 
 function handleMenuClick({ key }: { key: string }) {
-  if (key === '/orders') {
-    router.push(key)
-  }
+  // if (key === '/orders') {
+     router.push(key)
+  // }
 }
 
 function handleUserMenuOpenChange(open: boolean) {

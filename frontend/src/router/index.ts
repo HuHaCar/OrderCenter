@@ -32,6 +32,12 @@ const router = createRouter({
           component: () => import('@/pages/order/OrderCenterPage.vue'),
           meta: { title: '订单中心' },
         },
+        {
+          path: 'sales',
+          name: 'Sales',
+          component: () => import('@/pages/sales/salesPage.vue'),
+          meta: { title: '业务员' },
+        },
       ],
     },
     {

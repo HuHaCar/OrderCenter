@@ -31,36 +31,60 @@
       :fixed="column.fixed"
       :show-overflow="column.ellipsis ?? true"
     >
-      <template #default="{ row }">
-        <slot :name="`cell-${column.key}`" :row="row" :column="column">
-          {{ column.formatter ? column.formatter(row[column.field], row) : (row[column.field] ?? '—') }}
+      <template #default="{ row, $rowIndex }">
+        <CellRenderer
+          v-if="column.renderCell"
+          :render="column.renderCell"
+          :context="{
+            row,
+            column,
+            value: row[column.field],
+            index: $rowIndex,
+            $index: $rowIndex,
+          }"
+        />
+
+        <slot
+          v-else
+          :name="`cell-${column.key}`"
+          :row="row"
+          :column="column"
+          :$index="$rowIndex"
+        >
+          {{ column.formatter
+            ? column.formatter(row[column.field], row)
+            : (row[column.field] ?? '—') }}
         </slot>
       </template>
     </vxe-column>
   </vxe-table>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue'
+<script setup lang="ts" generic="T extends Record<string, any>">
+import { defineComponent, ref } from 'vue'
 import type { BaseTableColumn } from '@/types/table'
 import { VxeColumn, VxeTable } from 'vxe-table'
 
 /**
  * UI 基础组件：只负责“怎么展示表格”。
- * 不关心订单业务、不请求接口，任何列表都可以复用。
- * 通过 vxe-table 的 scroll-y 配置开启虚拟滚动。
+ * 不关心业务、不请求接口，任何列表都可以复用。
+ *
+ * renderCell 优先于自定义插槽，插槽优先于 formatter/default。
+ * renderCell 返回 VNodeChild，适合状态标签、操作按钮等复杂单元格。
  */
+defineOptions({ name: 'BaseTable' })
+
 withDefaults(
   defineProps<{
-    columns: BaseTableColumn[]
-    data: Record<string, unknown>[]
+    columns: BaseTableColumn<T>[]
+    data: T[]
     loading?: boolean
     height?: number | string
     rowKey?: string
     virtual?: boolean
     emptyText?: string
     selectable?: boolean
-    selectableMethod?: (params: { row: Record<string, unknown> }) => boolean
+    selectableMethod?: (params: { row: T }) => boolean
   }>(),
   {
     loading: false,
@@ -78,12 +102,33 @@ const emit = defineEmits<{
 
 const tableRef = ref()
 
+/**
+ * Vue 模板不能直接输出 VNode，这里用一个小型函数组件承接 renderCell。
+ */
+const CellRenderer = defineComponent({
+  name: 'CellRenderer',
+  props: {
+    render: {
+      type: Function,
+      required: true,
+    },
+    context: {
+      type: Object,
+      required: true,
+    },
+  },
+  setup(props) {
+    return () => (props.render as (context: unknown) => unknown)(props.context)
+  },
+})
+
 function emitSelection() {
   const rows = tableRef.value?.getCheckboxRecords?.() ?? []
-  emit('selection-change', rows.map((row: { id: string | number }) => row.id))
+  emit(
+    'selection-change',
+    rows.map((row: { id: string | number }) => row.id),
+  )
 }
-
-defineOptions({ name: 'BaseTable' })
 </script>
 
 <style scoped>

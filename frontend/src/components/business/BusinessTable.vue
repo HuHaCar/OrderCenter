@@ -2,17 +2,17 @@
   <a-card class="business-table-card" :bordered="false">
     <div class="business-table-card__head">
       <div class="business-table-card__heading">
-        <span class="business-table-card__title">订单列表</span>
-        <span class="business-table-card__count">共 {{ orderStore.total }} 条</span>
+        <span class="business-table-card__title">{{ title }}</span>
+        <span class="business-table-card__count">共 {{ query.total }} 条</span>
       </div>
       <div v-if="$slots.toolbar" class="business-table-card__toolbar">
         <slot name="toolbar" />
       </div>
       <a-button
-        :loading="orderStore.loading && orderStore.loadingAction === 'refresh'"
-        :disabled="orderStore.loading && orderStore.loadingAction !== 'refresh'"
+        :loading="query.loading && query.loadingAction === 'refresh'"
+        :disabled="query.loading && query.loadingAction !== 'refresh'"
         size="small"
-        @click="orderStore.refresh"
+        @click="query.refresh"
       >
         <template #icon><ReloadOutlined /></template>
         刷新
@@ -32,146 +32,91 @@
     <BaseTable
       :columns="columns"
       :data="rows"
-      :loading="orderStore.loading"
+      :loading="query.loading"
       :height="tableHeight"
-      row-key="id"
-      empty-text="暂无订单，试试调整筛选条件"
-      selectable
+      :row-key="rowKey"
+      :empty-text="emptyText"
+      :selectable="selectable"
+      :selectable-method="selectableMethod"
       @selection-change="handleSelectionChange"
-    >
-      <template #cell-shipping="{ row }">
-        <div class="shipping-cell">
-          <span class="shipping-cell__method">
-            {{ row.shippingMethodLabel || row.shippingMethod }}
-          </span>
-          <span class="shipping-cell__country">
-            {{ getCountryName(row.recipientCountry) }}
-          </span>
-        </div>
-      </template>
-
-      <template #cell-totalAmount="{ row }">
-        <span v-if="row.totalAmount != null" class="order-amount">
-          ¥ {{ formatCurrency(row.totalAmount) }}
-        </span>
-        <span v-else class="order-amount order-amount--empty">—</span>
-      </template>
-
-      <template #cell-status="{ row }">
-        <a-tag :color="ORDER_STATUS_META[row.status as Order['status']]?.color">
-          {{ ORDER_STATUS_META[row.status as Order['status']]?.label ?? row.statusLabel }}
-        </a-tag>
-      </template>
-
-      <template #cell-createdAt="{ row }">
-        <span class="order-time">{{ formatDateTime(row.createdAt) }}</span>
-      </template>
-
-      <template #cell-actions="{ row }">
-        <div class="row-actions">
-          <a-button
-            v-if="row.status === 'T'"
-            type="link"
-            size="small"
-            @click="emit('forecast', row)"
-          >
-            预报
-          </a-button>
-          <a-button
-            v-if="row.status === 'T' || row.status === 'S'"
-            type="link"
-            size="small"
-            @click="emit('edit', row)"
-          >
-            编辑
-          </a-button>
-          <a-button
-            v-if="row.status === 'T' || row.status === 'S'"
-            type="link"
-            size="small"
-            danger
-            @click="emit('delete', row)"
-          >
-            删除
-          </a-button>
-          <a-button
-            type="link"
-            size="small"
-            @click="emit('logs', row)"
-          >
-            日志
-          </a-button>
-        </div>
-      </template>
-    </BaseTable>
+    />
 
     <div class="business-table-card__footer">
-      <span class="business-table-card__hint">支持 100 条 / 页的虚拟滚动列表</span>
+      <span class="business-table-card__hint">支持虚拟滚动列表</span>
       <a-pagination
-        :current="orderStore.page"
-        :page-size="orderStore.pageSize"
-        :total="orderStore.total"
+        :current="query.page"
+        :page-size="query.pageSize"
+        :total="query.total"
         :show-size-changer="true"
         :page-size-options="['20', '50', '100', '200']"
         :show-total="showTotal"
-        :disabled="orderStore.loading"
+        :disabled="query.loading"
         @change="handlePageChange"
       />
     </div>
   </a-card>
 </template>
 
-<script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+<script setup lang="ts" generic="T extends Record<string, any>">
+import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
-import { getCountryName } from '@/constants/countries'
-import { ORDER_STATUS_META } from '@/constants/order'
-import { useOrderStore } from '@/stores/order'
 import type {
   BaseTableColumn,
+  TableFetchParams,
+  TableQuery,
   TableResult,
   TableResultFormatter,
 } from '@/types/table'
-import type { Order, OrderQuery, PageResult } from '@/types/order'
-import { formatCurrency, formatDateTime } from '@/utils/format'
 
 /**
- * 业务组件：负责订单数据获取、分页、加载/错误状态。
- * 具体 API 函数由页面级组件通过 fetchApi 注入，业务组件不直接依赖 api/order.ts。
+ * 通用业务表格：
+ * - 只负责数据请求、分页、loading、错误、selection
+ * - 查询状态由页面通过 query 注入
+ * - 请求参数由页面通过 buildQuery 组装
+ * - 单元格渲染由页面 columns[].renderCell 负责
  */
 defineOptions({ name: 'BusinessTable' })
 
-const props = defineProps<{
-  fetchApi: (query: OrderQuery) => Promise<unknown>
-  columns: BaseTableColumn[]
-  formatResult?: TableResultFormatter<Order>
-}>()
+const props = withDefaults(
+  defineProps<{
+    query: TableQuery
+    fetchApi: (params: TableFetchParams) => Promise<unknown>
+    buildQuery: (page: number, size: number) => TableFetchParams
+    columns: BaseTableColumn<T>[]
+    formatResult?: TableResultFormatter<T>
+    title?: string
+    emptyText?: string
+    errorText?: string
+    rowKey?: string
+    selectable?: boolean
+    selectableMethod?: (params: { row: T }) => boolean
+  }>(),
+  {
+    title: '数据列表',
+    emptyText: '暂无数据',
+    errorText: '数据加载失败',
+    rowKey: 'id',
+    selectable: true,
+  },
+)
 
 const emit = defineEmits<{
-  (event: 'forecast', order: Order): void
-  (event: 'edit', order: Order): void
-  (event: 'delete', order: Order): void
-  (event: 'logs', order: Order): void
-  (event: 'selection-change', orders: Order[]): void
+  (event: 'selection-change', rows: T[]): void
 }>()
 
-const orderStore = useOrderStore()
-type OrderRow = Order & { serial: number }
-
-const rows = ref<OrderRow[]>([])
+const rows = shallowRef<T[]>([])
 const errorMessage = ref('')
 const tableHeight = ref(520)
 let requestSeq = 0
 
-/**
- * 业务组件的默认响应格式：
- * 当前后端返回 { records, total, page, size }。
- * 页面级组件可以通过 format-result 覆盖成其他结构。
- */
-function defaultFormatResult(result: unknown): TableResult<Order> {
-  const page = result as Partial<PageResult<Order>> | null | undefined
+const defaultFormatResult: TableResultFormatter<T> = (result) => {
+  const page = result as
+    | { records?: T[]; total?: number; page?: number; size?: number }
+    | null
+    | undefined
+
   return {
     data: page?.records ?? [],
     total: page?.total ?? 0,
@@ -199,40 +144,40 @@ function showTotal(total: number) {
   return `共 ${total} 条`
 }
 
-async function loadOrders() {
+async function loadData() {
   const seq = ++requestSeq
-  orderStore.setLoading(true)
+  props.query.setLoading(true)
   errorMessage.value = ''
 
   try {
-    const rawResult = await props.fetchApi({
-      page: orderStore.page,
-      size: orderStore.pageSize,
-      keyword: orderStore.filters.keyword.trim() || undefined,
-      status: orderStore.filters.status,
-    })
+    const rawResult = await props.fetchApi(
+      props.buildQuery(props.query.page, props.query.pageSize),
+    )
 
     if (seq !== requestSeq) return
 
     const result = (props.formatResult ?? defaultFormatResult)(rawResult)
-    const currentPage = result.page ?? orderStore.page
-    const currentSize = result.size ?? orderStore.pageSize
+    const currentPage = result.page ?? props.query.page
+    const currentSize = result.size ?? props.query.pageSize
 
-    rows.value = result.data.map((order, index) => ({
-      ...order,
+    rows.value = result.data.map((item, index) => ({
+      ...item,
       serial: (currentPage - 1) * currentSize + index + 1,
-    }))
-    orderStore.setTotal(result.total)
+    })) as T[]
+
+    props.query.setTotal(result.total)
     emit('selection-change', [])
   } catch (error) {
     if (seq !== requestSeq) return
     rows.value = []
-    orderStore.setTotal(0)
-    errorMessage.value = error instanceof Error ? error.message : '订单加载失败'
+    props.query.setTotal(0)
+    errorMessage.value = error instanceof Error
+      ? error.message
+      : props.errorText
     message.error(errorMessage.value)
   } finally {
     if (seq === requestSeq) {
-      orderStore.setLoading(false)
+      props.query.setLoading(false)
     }
   }
 }
@@ -241,15 +186,19 @@ function handleSelectionChange(ids: Array<string | number>) {
   const selectedIds = new Set(ids.map(Number))
   emit(
     'selection-change',
-    rows.value.filter((order) => selectedIds.has(order.id)),
+    rows.value.filter((row) => selectedIds.has(Number(row.id))),
   )
 }
 
 function handlePageChange(page: number, size: number) {
-  orderStore.changePage(page, size)
+  props.query.changePage(page, size)
 }
 
-watch(() => orderStore.refreshToken, loadOrders, { immediate: true })
+watch(
+  () => props.query.refreshToken,
+  loadData,
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -292,54 +241,6 @@ watch(() => orderStore.refreshToken, loadOrders, { immediate: true })
 
 .business-table-card__alert {
   margin-bottom: 14px;
-}
-
-.row-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.row-actions :deep(.ant-btn) {
-  padding: 0 6px;
-}
-
-.shipping-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  line-height: 1.35;
-}
-
-.shipping-cell__method {
-  overflow: hidden;
-  color: #2c3648;
-  font-size: 12.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shipping-cell__country {
-  color: #8a96a8;
-  font-size: 11.5px;
-}
-
-.order-amount {
-  color: #162033;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.order-amount--empty {
-  color: #a1abba;
-  font-weight: 400;
-}
-
-.order-time {
-  color: #7c889b;
-  font-variant-numeric: tabular-nums;
 }
 
 .business-table-card__footer {

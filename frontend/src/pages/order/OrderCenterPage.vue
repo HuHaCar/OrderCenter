@@ -1,12 +1,13 @@
 <template>
   <TableView
-    :fetch-api="getOrderList"
+    :query="orderStore"
+    :fetch-api="fetchOrders"
+    :build-query="buildOrderQuery"
     :columns="orderColumns"
     :format-result="formatOrderResult"
-    @forecast="openForecastConfirm"
-    @edit="openEditOrder"
-    @delete="openDeleteConfirm"
-    @logs="openLogModal"
+    title="订单列表"
+    empty-text="暂无订单，试试调整筛选条件"
+    error-text="订单加载失败"
     @selection-change="handleSelectionChange"
   >
     <template #filters>
@@ -180,21 +181,23 @@
   </BaseModal>
 </template>
 
-<script setup lang="ts">
+<script setup lang="tsx">
 import { computed, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { Button, Tag, message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
 import OrderLogModal from '@/components/business/OrderLogModal.vue'
 import { createDraftOrder, createOrder, deleteOrders, exportOrders, forecastOrder, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
-import { ORDER_STATUS_OPTIONS } from '@/constants/order'
+import { getCountryName } from '@/constants/countries'
+import { ORDER_STATUS_META, ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
 import { useOrderStore } from '@/stores/order'
-import type { BaseTableColumn, TableResult } from '@/types/table'
-import type { CreateDraftPayload, CreateOrderPayload, Order, PageResult, ShippingOption } from '@/types/order'
+import type { BaseTableColumn, TableFetchParams, TableResult } from '@/types/table'
+import type { CreateDraftPayload, CreateOrderPayload, Order, OrderQuery, PageResult, ShippingOption } from '@/types/order'
 import { downloadBlob } from '@/utils/download'
+import { formatCurrency, formatDateTime } from '@/utils/format'
 
 /**
  * 路由级页面：负责提供表头、响应格式、查询条件和页面级弹窗。
@@ -234,18 +237,109 @@ const isResetting = computed(
   () => orderStore.loading && orderStore.loadingAction === 'reset',
 )
 
-const orderColumns: BaseTableColumn[] = [
+const orderColumns: BaseTableColumn<Order>[] = [
   { key: 'serial', field: 'serial', title: '序号', width: 60, align: 'center' },
   { key: 'orderNo', field: 'orderNo', title: '订单号', width: 160 },
-  { key: 'shipping', field: 'shippingMethod', title: '运输方式', width: 170 },
+  {
+    key: 'shipping',
+    field: 'shippingMethod',
+    title: '运输方式',
+    width: 170,
+    renderCell: ({ row }) => (
+      <div class="shipping-cell">
+        <span class="shipping-cell__method">
+          {row.shippingMethodLabel || row.shippingMethod}
+        </span>
+        <span class="shipping-cell__country">
+          {getCountryName(row.recipientCountry)}
+        </span>
+      </div>
+    ),
+  },
   { key: 'customerName', field: 'customerName', title: '客户', width: 95 },
   { key: 'customerPhone', field: 'customerPhone', title: '联系电话', width: 125 },
   { key: 'productName', field: 'productName', title: '商品', minWidth: 150 },
   { key: 'quantity', field: 'quantity', title: '数量', width: 64, align: 'right' },
-  { key: 'totalAmount', field: 'totalAmount', title: '金额', width: 120, align: 'right' },
-  { key: 'status', field: 'status', title: '状态', width: 90, align: 'center' },
-  { key: 'createdAt', field: 'createdAt', title: '下单时间', width: 140 },
-  { key: 'actions', field: 'id', title: '操作', width: 220, align: 'center', fixed: 'right' },
+  {
+    key: 'totalAmount',
+    field: 'totalAmount',
+    title: '金额',
+    width: 120,
+    align: 'right',
+    renderCell: ({ row }) => (
+      row.totalAmount == null
+        ? <span class="order-amount order-amount--empty">—</span>
+        : <span class="order-amount">¥ {formatCurrency(row.totalAmount)}</span>
+    ),
+  },
+  {
+    key: 'status',
+    field: 'status',
+    title: '状态',
+    width: 90,
+    align: 'center',
+    renderCell: ({ row }) => (
+      <Tag color={ORDER_STATUS_META[row.status]?.color}>
+        {ORDER_STATUS_META[row.status]?.label ?? row.statusLabel}
+      </Tag>
+    ),
+  },
+  {
+    key: 'createdAt',
+    field: 'createdAt',
+    title: '下单时间',
+    width: 140,
+    renderCell: ({ row }) => (
+      <span class="order-time">{formatDateTime(row.createdAt)}</span>
+    ),
+  },
+  {
+    key: 'actions',
+    field: 'id',
+    title: '操作',
+    width: 220,
+    align: 'center',
+    fixed: 'right',
+    renderCell: ({ row }) => (
+      <div class="row-actions">
+        {row.status === 'T' && (
+          <Button
+            type="link"
+            size="small"
+            onClick={() => openForecastConfirm(row)}
+          >
+            预报
+          </Button>
+        )}
+        {(row.status === 'T' || row.status === 'S') && (
+          <>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => openEditOrder(row)}
+            >
+              编辑
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              danger
+              onClick={() => openDeleteConfirm(row)}
+            >
+              删除
+            </Button>
+          </>
+        )}
+        <Button
+          type="link"
+          size="small"
+          onClick={() => openLogModal(row)}
+        >
+          日志
+        </Button>
+      </div>
+    ),
+  },
 ]
 
 /**
@@ -261,6 +355,19 @@ function formatOrderResult(result: unknown): TableResult<Order> {
     page: page?.page,
     size: page?.size,
   }
+}
+
+function buildOrderQuery(page: number, size: number): TableFetchParams {
+  return {
+    page,
+    size,
+    keyword: orderStore.filters.keyword.trim() || undefined,
+    status: orderStore.filters.status,
+  }
+}
+
+function fetchOrders(params: TableFetchParams) {
+  return getOrderList(params as unknown as OrderQuery)
 }
 
 function openCreateModal() {
@@ -536,6 +643,54 @@ async function handleConfirmDelete() {
   margin-top: 6px !important;
   color: #98a3b3;
   font-size: 12px;
+}
+
+:global(.shipping-cell) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+:global(.shipping-cell__method) {
+  overflow: hidden;
+  color: #2c3648;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.shipping-cell__country) {
+  color: #8a96a8;
+  font-size: 11.5px;
+}
+
+:global(.order-amount) {
+  color: #162033;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+:global(.order-amount--empty) {
+  color: #a1abba;
+  font-weight: 400;
+}
+
+:global(.order-time) {
+  color: #7c889b;
+  font-variant-numeric: tabular-nums;
+}
+
+:global(.row-actions) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+:global(.row-actions .ant-btn) {
+  padding: 0 6px;
 }
 
 @media (max-width: 760px) {

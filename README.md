@@ -399,6 +399,7 @@ app:
 - `vxe-table` 依赖 `xe-utils`，当前 `xe-utils@4.2.1` 的 npm 包缺少 `es/index.esm.js`，会导致 Vite 构建报 `Failed to resolve entry for package "xe-utils"`。
 - 项目已在 `frontend/package.json` 中用 `overrides` 锁定 `xe-utils@4.1.5`，首次安装必须保留 `overrides`，不要单独升级 `xe-utils`。
 - 当前依赖按 Node 18 可运行版本锁定（Vite 5）；如果升级到 Node 22，可以后续整体升级到 Vite 7/8。
+- 表格支持在列定义里写 `renderCell`，页面使用 TSX 时需要 `@vitejs/plugin-vue-jsx`。当前锁定在 `~4.2.0`，因为 5.x 要求 Node 20.19+。
 
 ## 调试建议
 
