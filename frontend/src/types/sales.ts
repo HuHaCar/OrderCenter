@@ -11,6 +11,7 @@ export interface Sales {
   email: string | null
   idCardNo: string | null
   remark: string | null
+  currentMonthPerformance: number | null
   createdAt: string
   updatedAt: string
 }

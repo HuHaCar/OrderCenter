@@ -1,15 +1,15 @@
 package com.ordercenter.sales.dto;
 
-import com.ordercenter.sales.Sales;
+import com.ordercenter.sales.performance.SalesPerformanceView;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 业务员接口响应对象。
- * 字段与 Sales 实体对应，避免直接把 JPA Entity 暴露给前端。
+ * 业务员列表响应对象。
+ * 基础信息来自 Sales，本月业绩来自 sales_performance 的 LEFT JOIN 投影。
  *
- * 注意：idCardNo 属于敏感信息。如果列表接口不需要展示，
- * 建议在列表查询时不要返回该字段，或者单独做脱敏处理。
+ * 注意：idCardNo 属于敏感信息，列表接口如不需要建议移除或脱敏。
  */
 public record SalesResponse(
         Long id,
@@ -22,24 +22,26 @@ public record SalesResponse(
         String email,
         String idCardNo,
         String remark,
+        BigDecimal currentMonthPerformance,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
 
-    public static SalesResponse from(Sales sales) {
+    public static SalesResponse from(SalesPerformanceView view) {
         return new SalesResponse(
-                sales.getId(),
-                sales.getEmployeeNo(),
-                sales.getEmployeeName(),
-                sales.getLever(),
-                sales.getEntryDate(),
-                sales.getGender() == null ? null : sales.getGender().intValue(),
-                sales.getPhone(),
-                sales.getEmail(),
-                sales.getIdCardNo(),
-                sales.getRemark(),
-                sales.getCreatedAt(),
-                sales.getUpdatedAt()
+                view.getId(),
+                view.getEmployeeNo(),
+                view.getEmployeeName(),
+                view.getLever(),
+                view.getEntryDate(),
+                view.getGender(),
+                view.getPhone(),
+                view.getEmail(),
+                view.getIdCardNo(),
+                view.getRemark(),
+                view.getCurrentMonthPerformance(),
+                view.getCreatedAt(),
+                view.getUpdatedAt()
         );
     }
 }

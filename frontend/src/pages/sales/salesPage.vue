@@ -69,7 +69,7 @@ import { SALES_LEVER_OPTIONS, getGenderLabel, getSalesLeverLabel } from '@/const
 import { useSalesStore } from '@/stores/sales'
 import type { BaseTableColumn, TableFetchParams, TableResult } from '@/types/table'
 import type { Sales, SalesPageResult, SalesQuery } from '@/types/sales'
-import { formatDateTime } from '@/utils/format'
+import { formatCurrency, formatDateTime } from '@/utils/format'
 
 /**
  * 业务员列表页：
@@ -113,6 +113,16 @@ const salesColumns: BaseTableColumn<Sales>[] = [
   },
   { key: 'phone', field: 'phone', title: '手机号', width: 130 },
   { key: 'email', field: 'email', title: '邮箱', minWidth: 180 },
+  {
+    key: 'currentMonthPerformance',
+    field: 'currentMonthPerformance',
+    title: '本月业绩',
+    width: 130,
+    align: 'right',
+    formatter: (value) => value == null
+      ? '—'
+      : `¥ ${formatCurrency(value as number)}`,
+  },
   { key: 'remark', field: 'remark', title: '备注', minWidth: 160 },
   {
     key: 'createdAt',
