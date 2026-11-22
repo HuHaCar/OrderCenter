@@ -1,5 +1,6 @@
 package com.ordercenter.order;
 
+import com.ordercenter.auth.AuthPrincipal;
 import com.ordercenter.common.ApiResponse;
 import com.ordercenter.common.PageResult;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ContentDisposition;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -67,9 +69,17 @@ public class OrderController {
             @RequestParam(required = false) String keyword,
 
             @Parameter(description = "订单状态：T/S/R/D/F/V/P/C/Q")
-            @RequestParam(required = false) String status
+            @RequestParam(required = false) String status,
+
+            @AuthenticationPrincipal AuthPrincipal principal
     ) {
-        return ApiResponse.ok(orderService.page(page, size, keyword, OrderStatus.fromCode(status)));
+        return ApiResponse.ok(orderService.page(
+                page,
+                size,
+                keyword,
+                OrderStatus.fromCode(status),
+                principal.userId()
+        ));
     }
 
     @Operation(summary = "新增订单")

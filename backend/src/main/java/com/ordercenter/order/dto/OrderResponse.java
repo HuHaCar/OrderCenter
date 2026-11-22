@@ -24,6 +24,7 @@ public record OrderResponse(
         String status,
         String statusLabel,
         String remark,
+        Long createBy,
         LocalDateTime createdAt
 ) {
 
@@ -43,6 +44,7 @@ public record OrderResponse(
                 order.getStatus().getCode(),
                 order.getStatus().getLabel(),
                 order.getRemark(),
+                order.getCreateBy(),
                 order.getCreatedAt()
         );
     }

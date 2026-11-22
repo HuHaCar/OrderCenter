@@ -54,6 +54,13 @@ public class Order {
     @Column(length = 255)
     private String remark;
 
+    /**
+     * 创建该订单的后台用户 ID，对应 users.id，不是业务员 sales.id。
+     * 历史订单没有创建者时为 null。
+     */
+    @Column(name = "create_by")
+    private Long createBy;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -166,6 +173,14 @@ public class Order {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public Long getCreateBy() {
+        return createBy;
+    }
+
+    public void setCreateBy(Long createBy) {
+        this.createBy = createBy;
     }
 
     public LocalDateTime getCreatedAt() {

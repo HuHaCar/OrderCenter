@@ -1,5 +1,6 @@
 package com.ordercenter.order;
 
+import com.ordercenter.auth.AuthPrincipal;
 import com.ordercenter.common.PageResult;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
@@ -13,6 +14,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,13 +49,22 @@ public class OrderService {
         this.orderLogService = orderLogService;
     }
 
-    public PageResult<OrderResponse> page(int page, int size, String keyword, OrderStatus status) {
+    public PageResult<OrderResponse> page(
+            int page,
+            int size,
+            String keyword,
+            OrderStatus status,
+            Long currentUserId
+    ) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         String safeKeyword = StringUtils.hasText(keyword) ? keyword.trim().toLowerCase(Locale.ROOT) : null;
 
         Specification<Order> specification = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // 数据权限：当前用户只能看到自己创建的订单。
+            predicates.add(cb.equal(root.get("createBy"), currentUserId));
 
             if (safeKeyword != null) {
                 String like = "%" + safeKeyword + "%";
@@ -117,6 +129,7 @@ public class OrderService {
         );
         order.setStatus(OrderStatus.FORECAST);
         order.setRemark(StringUtils.hasText(request.remark()) ? request.remark().trim() : null);
+        order.setCreateBy(currentUserId());
 
         Order saved = orderRepository.save(order);
         orderLogService.record(saved, OrderLogAction.CREATE,
@@ -141,6 +154,7 @@ public class OrderService {
         order.setQuantity(request.quantity());
         order.setUnitPrice(request.unitPrice());
         order.setRemark(trimToNull(request.remark()));
+        order.setCreateBy(currentUserId());
         if (request.quantity() != null && request.unitPrice() != null) {
             order.setTotalAmount(
                     request.unitPrice()
@@ -272,6 +286,16 @@ public class OrderService {
                         .multiply(BigDecimal.valueOf(order.getQuantity()))
                         .setScale(2, RoundingMode.HALF_UP)
         );
+    }
+
+    private static Long currentUserId() {
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null
+                && authentication.getPrincipal() instanceof AuthPrincipal principal) {
+            return principal.userId();
+        }
+        return null;
     }
 
     private static String trimToNull(String value) {

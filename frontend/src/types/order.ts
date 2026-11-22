@@ -15,6 +15,7 @@ export interface Order {
   status: OrderStatus
   statusLabel: string
   remark: string | null
+  createBy: number | null
   createdAt: string
 }
 
