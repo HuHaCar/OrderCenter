@@ -9,6 +9,7 @@
     :row-config="{ keyField: rowKey, height: 48 }"
     :scroll-y="{ enabled: virtual, gt: 18 }"
     :show-overflow="true"
+    :tooltip-config="tooltipConfig"
     :empty-text="emptyText"
     :checkbox-config="selectableMethod ? { checkMethod: selectableMethod } : undefined"
     @checkbox-change="emitSelection"
@@ -99,6 +100,11 @@ withDefaults(
 const emit = defineEmits<{
   (event: 'selection-change', ids: Array<string | number>): void
 }>()
+
+const tooltipConfig = {
+  showAll: true,
+  mode: 'tooltip' as const,
+}
 
 const tableRef = ref()
 

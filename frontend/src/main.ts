@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import Antd from 'ant-design-vue'
+import { VxeLoading, VxeTooltip } from 'vxe-pc-ui'
+import { VxeUI } from 'vxe-table'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import 'ant-design-vue/dist/reset.css'
@@ -13,6 +15,10 @@ import { setSessionExpiredHandler } from '@/auth/session'
 import { useAuthStore } from '@/stores/auth'
 
 dayjs.locale('zh-cn')
+
+// vxe-table 的 tooltip/loading 不是 vxe-table 自带组件，需要注册到 VxeUI。
+VxeUI.component(VxeTooltip)
+VxeUI.component(VxeLoading)
 
 const app = createApp(App)
 const pinia = createPinia()
