@@ -47,6 +47,7 @@ export interface CreateOrderPayload {
   quantity: number
   unitPrice: number
   remark?: string
+  attachmentIds?: number[]
 }
 
 export interface ShippingOption {
@@ -65,6 +66,7 @@ export interface CreateDraftPayload {
   quantity?: number
   unitPrice?: number
   remark?: string
+  attachmentIds?: number[]
 }
 
 export interface OrderLog {
@@ -74,4 +76,12 @@ export interface OrderLog {
   description: string
   operator: string
   createdAt: string
+}
+
+export interface FileAsset {
+  id: number
+  originalName: string
+  contentType: string
+  fileSize: number
+  image: boolean
 }

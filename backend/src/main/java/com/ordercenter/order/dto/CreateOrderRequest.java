@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 新增订单请求。
@@ -48,6 +49,9 @@ public record CreateOrderRequest(
         BigDecimal unitPrice,
 
         @Size(max = 255, message = "备注不能超过 255 个字符")
-        String remark
+        String remark,
+
+        @Size(max = 3, message = "最多上传 3 个附件")
+        List<Long> attachmentIds
 ) {
 }

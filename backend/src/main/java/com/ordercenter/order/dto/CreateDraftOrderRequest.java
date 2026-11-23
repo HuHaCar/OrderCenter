@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 保存草稿时只强制运输方式和收件国家。
@@ -25,6 +26,9 @@ public record CreateDraftOrderRequest(
         String productName,
         Integer quantity,
         BigDecimal unitPrice,
-        String remark
+        String remark,
+
+        @Size(max = 3, message = "最多上传 3 个附件")
+        List<Long> attachmentIds
 ) {
 }

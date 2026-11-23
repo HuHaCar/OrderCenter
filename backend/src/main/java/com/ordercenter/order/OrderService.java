@@ -2,6 +2,7 @@ package com.ordercenter.order;
 
 import com.ordercenter.auth.AuthPrincipal;
 import com.ordercenter.common.PageResult;
+import com.ordercenter.file.OrderAttachmentService;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
@@ -38,15 +39,18 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ShippingMethodCatalog shippingMethodCatalog;
     private final OrderLogService orderLogService;
+    private final OrderAttachmentService orderAttachmentService;
 
     public OrderService(
             OrderRepository orderRepository,
             ShippingMethodCatalog shippingMethodCatalog,
-            OrderLogService orderLogService
+            OrderLogService orderLogService,
+            OrderAttachmentService orderAttachmentService
     ) {
         this.orderRepository = orderRepository;
         this.shippingMethodCatalog = shippingMethodCatalog;
         this.orderLogService = orderLogService;
+        this.orderAttachmentService = orderAttachmentService;
     }
 
     public PageResult<OrderResponse> page(
@@ -132,6 +136,11 @@ public class OrderService {
         order.setCreateBy(currentUserId());
 
         Order saved = orderRepository.save(order);
+        orderAttachmentService.attachToOrder(
+                saved.getId(),
+                request.attachmentIds(),
+                currentUserId()
+        );
         orderLogService.record(saved, OrderLogAction.CREATE,
                 "创建订单，状态：" + saved.getStatus().getLabel());
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
@@ -165,6 +174,11 @@ public class OrderService {
         order.setStatus(OrderStatus.DRAFT);
 
         Order saved = orderRepository.save(order);
+        orderAttachmentService.attachToOrder(
+                saved.getId(),
+                request.attachmentIds(),
+                currentUserId()
+        );
         orderLogService.record(saved, OrderLogAction.DRAFT, "保存草稿");
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }

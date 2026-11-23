@@ -2,7 +2,7 @@
   <BaseModal
     :open="open"
     :title="isEdit ? '编辑订单' : '新增订单'"
-    width="640px"
+    width="1000px"
     :closable="!loading && !draftLoading"
     @cancel="handleCancel"
   >
@@ -114,6 +114,101 @@
         />
       </a-form-item>
 
+      <a-form-item v-if="!isEdit" label="附件" class="order-form__attachment-item">
+        <div class="attachment-grid">
+          <div
+            v-for="item in attachments"
+            :key="item.uid"
+            class="attachment-card"
+          >
+            <div
+              class="attachment-card__preview"
+              @click="handleAttachmentClick(item)"
+            >
+              <a-image
+                v-if="item.image && item.previewUrl"
+                :src="item.previewUrl"
+                :width="64"
+                :height="64"
+                class="attachment-card__image"
+              />
+              <FileWordOutlined
+                v-else-if="isWordFile(item.name)"
+                class="attachment-card__icon attachment-card__icon--word"
+              />
+              <FileExcelOutlined
+                v-else-if="isExcelFile(item.name)"
+                class="attachment-card__icon attachment-card__icon--excel"
+              />
+              <FileZipOutlined
+                v-else-if="isArchiveFile(item.name)"
+                class="attachment-card__icon attachment-card__icon--archive"
+              />
+              <FileImageOutlined
+                v-else-if="item.image"
+                class="attachment-card__icon attachment-card__icon--image"
+              />
+              <FileOutlined
+                v-else
+                class="attachment-card__icon"
+              />
+
+              <a-spin
+                v-if="item.status === 'uploading'"
+                class="attachment-card__spinner"
+                size="small"
+              />
+            </div>
+
+            <div class="attachment-card__body">
+              <div class="attachment-card__name" :title="item.name">
+                {{ item.name }}
+              </div>
+              <div class="attachment-card__meta">
+                <span>{{ formatFileSize(item.size) }}</span>
+                <span v-if="item.status === 'uploading'">
+                  {{ item.progress }}%
+                </span>
+                <span v-else-if="item.status === 'error'" class="attachment-card__error">
+                  上传失败
+                </span>
+              </div>
+            </div>
+
+            <a-button
+              type="text"
+              size="small"
+              danger
+              class="attachment-card__remove"
+              :disabled="item.status === 'uploading'"
+              @click.stop="removeAttachment(item)"
+            >
+              <DeleteOutlined />
+            </a-button>
+          </div>
+
+          <a-upload
+            v-if="attachments.length < MAX_ATTACHMENT_COUNT"
+            class="attachment-upload"
+            accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z,.tar,.gz"
+            :multiple="false"
+            :show-upload-list="false"
+            :disabled="hasUploadingAttachment"
+            :before-upload="beforeAttachmentUpload"
+            :custom-request="handleAttachmentUpload"
+          >
+            <div class="attachment-upload-card">
+              <PlusOutlined class="attachment-upload-card__icon" />
+              <span>上传附件</span>
+              <small>最多 {{ MAX_ATTACHMENT_COUNT }} 个</small>
+            </div>
+          </a-upload>
+        </div>
+        <div class="order-form__attachment-hint">
+          选填，支持图片、Word、Excel、压缩包；单个文件不超过 200MB，最多 3 个。
+        </div>
+      </a-form-item>
+
       <div class="order-form__summary">
         <div>
           <span>预计金额</span>
@@ -131,7 +226,7 @@
         <a-button
           v-if="!isEdit"
           :loading="draftLoading"
-          :disabled="loading"
+          :disabled="loading || hasUploadingAttachment"
           @click="handleSaveDraft"
         >
           保存草稿
@@ -139,7 +234,7 @@
         <a-button
           type="primary"
           :loading="loading"
-          :disabled="draftLoading"
+          :disabled="draftLoading || hasUploadingAttachment"
           @click="handleOk"
         >
           {{ isEdit ? '保存修改' : '保存订单' }}
@@ -150,10 +245,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
+import type { UploadRequestOption } from 'ant-design-vue/es/vc-upload/interface'
+import {
+  DeleteOutlined,
+  FileExcelOutlined,
+  FileImageOutlined,
+  FileOutlined,
+  FileWordOutlined,
+  FileZipOutlined,
+  PlusOutlined,
+} from '@ant-design/icons-vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import { downloadFile, uploadFile } from '@/api/file'
 import { COUNTRY_OPTIONS } from '@/constants/countries'
+import { downloadBlob } from '@/utils/download'
 import { formatCurrency } from '@/utils/format'
 import type {
   CreateDraftPayload,
@@ -217,6 +325,31 @@ function emptyForm(): OrderFormState {
 }
 
 const form = reactive<OrderFormState>(emptyForm())
+
+const MAX_ATTACHMENT_COUNT = 3
+const MAX_ATTACHMENT_SIZE = 200 * 1024 * 1024
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+  'doc', 'docx', 'xls', 'xlsx',
+  'zip', 'rar', '7z', 'tar', 'gz',
+])
+
+interface AttachmentItem {
+  uid: string
+  id?: number
+  name: string
+  size: number
+  image: boolean
+  status: 'uploading' | 'done' | 'error'
+  progress: number
+  previewUrl?: string
+  rawFile: File
+}
+
+const attachments = ref<AttachmentItem[]>([])
+const hasUploadingAttachment = computed(
+  () => attachments.value.some((item) => item.status === 'uploading'),
+)
 
 const shippingMethodOptions = computed(() =>
   props.shippingOptions.map((method) => ({
@@ -291,6 +424,122 @@ const estimatedAmount = computed(() => {
   return quantity > 0 && unitPrice > 0 ? quantity * unitPrice : 0
 })
 
+function extensionOf(fileName: string) {
+  const dot = fileName.lastIndexOf('.')
+  return dot < 0 ? '' : fileName.slice(dot + 1).toLowerCase()
+}
+
+function isImageFile(fileName: string, contentType = '') {
+  return contentType.startsWith('image/')
+    || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(extensionOf(fileName))
+}
+
+function isWordFile(fileName: string) {
+  return ['doc', 'docx'].includes(extensionOf(fileName))
+}
+
+function isExcelFile(fileName: string) {
+  return ['xls', 'xlsx'].includes(extensionOf(fileName))
+}
+
+function isArchiveFile(fileName: string) {
+  return ['zip', 'rar', '7z', 'tar', 'gz'].includes(extensionOf(fileName))
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function releaseAttachmentPreview(item: AttachmentItem) {
+  if (item.previewUrl) {
+    URL.revokeObjectURL(item.previewUrl)
+  }
+}
+
+function resetAttachments() {
+  attachments.value.forEach(releaseAttachmentPreview)
+  attachments.value = []
+}
+
+function beforeAttachmentUpload(file: File) {
+  if (attachments.value.length >= MAX_ATTACHMENT_COUNT) {
+    message.warning(`最多只能上传 ${MAX_ATTACHMENT_COUNT} 个附件`)
+    return false
+  }
+  if (file.size > MAX_ATTACHMENT_SIZE) {
+    message.error('单个附件不能超过 200MB')
+    return false
+  }
+  const extension = extensionOf(file.name)
+  if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
+    message.error('只支持图片、Word、Excel 和压缩包')
+    return false
+  }
+  return true
+}
+
+async function handleAttachmentUpload(options: UploadRequestOption) {
+  const rawFile = options.file as File
+  const image = isImageFile(rawFile.name, rawFile.type)
+  const item = reactive<AttachmentItem>({
+    uid: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name: rawFile.name,
+    size: rawFile.size,
+    image,
+    status: 'uploading',
+    progress: 0,
+    previewUrl: image ? URL.createObjectURL(rawFile) : undefined,
+    rawFile,
+  })
+
+  attachments.value.push(item)
+
+  try {
+    const result = await uploadFile(rawFile, (percent) => {
+      item.progress = percent
+      options.onProgress?.({ percent })
+    })
+    item.id = result.id
+    item.image = result.image
+    item.status = 'done'
+    item.progress = 100
+    if (item.image && !item.previewUrl) {
+      item.previewUrl = URL.createObjectURL(rawFile)
+    }
+    options.onSuccess?.(result)
+  } catch (error) {
+    item.status = 'error'
+    options.onError?.(error as Error)
+    message.error(error instanceof Error ? error.message : '附件上传失败')
+  }
+}
+
+function removeAttachment(item: AttachmentItem) {
+  if (item.status === 'uploading') return
+  releaseAttachmentPreview(item)
+  attachments.value = attachments.value.filter((current) => current.uid !== item.uid)
+}
+
+async function handleAttachmentClick(item: AttachmentItem) {
+  // 图片交给 a-image 的预览功能；其他格式点击下载
+  if (item.image) return
+
+  if (item.rawFile) {
+    downloadBlob(item.rawFile, item.name)
+    return
+  }
+
+  if (!item.id) return
+  try {
+    const blob = await downloadFile(item.id)
+    downloadBlob(blob, item.name)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '文件下载失败')
+  }
+}
+
 function resetForm() {
   Object.assign(form, emptyForm())
   nextTick(() => formRef.value?.clearValidate())
@@ -318,7 +567,11 @@ function fillForm(order: Order) {
 watch(
   [() => props.open, () => props.order],
   ([open]) => {
-    if (!open) return
+    if (!open) {
+      resetAttachments()
+      return
+    }
+    resetAttachments()
     if (isEdit.value && props.order) {
       fillForm(props.order)
     } else {
@@ -327,8 +580,20 @@ watch(
   },
 )
 
+onBeforeUnmount(resetAttachments)
+
+function currentAttachmentIds() {
+  return attachments.value
+    .filter((item) => item.status === 'done' && item.id)
+    .map((item) => item.id as number)
+}
+
 async function handleOk() {
   if (props.loading || !formRef.value) return
+  if (hasUploadingAttachment.value) {
+    message.warning('附件正在上传，请稍候')
+    return
+  }
 
   try {
     await formRef.value.validate()
@@ -345,6 +610,8 @@ async function handleOk() {
     return
   }
 
+  const attachmentIds = currentAttachmentIds()
+
   emit('submit', {
     shippingMethod: form.shippingMethod,
     recipientCountry: form.recipientCountry,
@@ -354,11 +621,16 @@ async function handleOk() {
     quantity: form.quantity,
     unitPrice: form.unitPrice,
     remark: form.remark.trim() || undefined,
+    attachmentIds: attachmentIds.length ? attachmentIds : undefined,
   })
 }
 
 async function handleSaveDraft() {
   if (isEdit.value || props.loading || props.draftLoading || !formRef.value) return
+  if (hasUploadingAttachment.value) {
+    message.warning('附件正在上传，请稍候')
+    return
+  }
 
   try {
     await formRef.value.validateFields(['shippingMethod', 'recipientCountry'])
@@ -367,6 +639,8 @@ async function handleSaveDraft() {
   }
 
   if (!form.shippingMethod || !form.recipientCountry) return
+
+  const attachmentIds = currentAttachmentIds()
 
   emit('save-draft', {
     shippingMethod: form.shippingMethod,
@@ -377,6 +651,7 @@ async function handleSaveDraft() {
     quantity: form.quantity ?? undefined,
     unitPrice: form.unitPrice ?? undefined,
     remark: form.remark.trim() || undefined,
+    attachmentIds: attachmentIds.length ? attachmentIds : undefined,
   })
 }
 
@@ -432,6 +707,156 @@ function handleCancel() {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.order-form__attachment-item :deep(.ant-form-item-control-input-content) {
+  width: 100%;
+}
+
+.attachment-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attachment-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 150px;
+  min-height: 112px;
+  padding: 8px;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  background: #fbfcff;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.attachment-card:hover {
+  border-color: #b9d3ff;
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.1);
+}
+
+.attachment-card__preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 64px;
+  cursor: pointer;
+}
+
+.attachment-card__image {
+  overflow: hidden;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.attachment-card__icon {
+  color: #7c889b;
+  font-size: 30px;
+}
+
+.attachment-card__icon--word {
+  color: #2b579a;
+}
+
+.attachment-card__icon--excel {
+  color: #217346;
+}
+
+.attachment-card__icon--archive {
+  color: #d08a21;
+}
+
+.attachment-card__icon--image {
+  color: #7a5af8;
+}
+
+.attachment-card__spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.attachment-card__body {
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.attachment-card__name {
+  overflow: hidden;
+  color: #2c3648;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+  color: #98a3b3;
+  font-size: 11px;
+}
+
+.attachment-card__error {
+  color: #ff4d4f;
+}
+
+.attachment-card__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 2px;
+  color: #98a3b3;
+}
+
+.attachment-upload-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  min-height: 112px;
+  border: 1px dashed #cbd7e8;
+  border-radius: 10px;
+  background: #fafcff;
+  color: #7c889b;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.attachment-upload-card:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.attachment-upload-card__icon {
+  margin-bottom: 5px;
+  font-size: 20px;
+}
+
+.attachment-upload-card span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attachment-upload-card small {
+  margin-top: 2px;
+  color: #a1abba;
+  font-size: 10px;
+}
+
+.order-form__attachment-hint {
+  margin-top: 6px;
+  color: #a1abba;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 </style>
