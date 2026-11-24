@@ -116,6 +116,13 @@
     @update:open="logModal.close"
   />
 
+  <OrderDetailModal
+    :open="detailModal.state.visible"
+    :order-id="detailOrder?.id ?? null"
+    :fetch-api="getOrderDetail"
+    @update:open="detailModal.close"
+  />
+
   <BaseModal
     :open="deleteConfirm.state.visible"
     title="确认删除"
@@ -188,8 +195,9 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableView from '@/components/page/TableView.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import OrderFormModal from '@/components/business/OrderFormModal.vue'
+import OrderDetailModal from '@/components/business/OrderDetailModal.vue'
 import OrderLogModal from '@/components/business/OrderLogModal.vue'
-import { createDraftOrder, createOrder, deleteOrders, exportOrders, forecastOrder, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
+import { createDraftOrder, createOrder, deleteOrders, exportOrders, forecastOrder, getOrderDetail, getOrderList, getOrderLogs, getShippingOptions, updateOrder } from '@/api/order'
 import { getCountryName } from '@/constants/countries'
 import { ORDER_STATUS_META, ORDER_STATUS_OPTIONS } from '@/constants/order'
 import { useModal } from '@/composables/useModal'
@@ -229,6 +237,8 @@ const exportConfirm = useModal<BatchTarget>()
 const exportTarget = exportConfirm.data
 const logModal = useModal<Order>()
 const logOrder = logModal.data
+const detailModal = useModal<Order>()
+const detailOrder = detailModal.data
 let shippingOptionsLoaded = false
 const isSearching = computed(
   () => orderStore.loading && orderStore.loadingAction === 'search',
@@ -297,11 +307,18 @@ const orderColumns: BaseTableColumn<Order>[] = [
     key: 'actions',
     field: 'id',
     title: '操作',
-    width: 220,
+    width: 280,
     align: 'center',
     fixed: 'right',
     renderCell: ({ row }) => (
       <div class="row-actions">
+        <Button
+          type="link"
+          size="small"
+          onClick={() => openDetail(row)}
+        >
+          详情
+        </Button>
         {row.status === 'T' && (
           <Button
             type="link"
@@ -474,6 +491,10 @@ function handleSelectionChange(orders: Order[]) {
 
 function openLogModal(order: Order) {
   logModal.open(order)
+}
+
+function openDetail(order: Order) {
+  detailModal.open(order)
 }
 
 function openDeleteConfirm(order: Order) {

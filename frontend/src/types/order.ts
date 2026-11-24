@@ -85,3 +85,8 @@ export interface FileAsset {
   fileSize: number
   image: boolean
 }
+
+export interface OrderDetail extends Order {
+  updatedAt: string
+  attachments: FileAsset[]
+}

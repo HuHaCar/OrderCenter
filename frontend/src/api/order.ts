@@ -1,4 +1,4 @@
-import type { CreateDraftPayload, CreateOrderPayload, Order, OrderLog, OrderQuery, PageResult, ShippingOption } from '@/types/order'
+import type { CreateDraftPayload, CreateOrderPayload, Order, OrderDetail, OrderLog, OrderQuery, PageResult, ShippingOption } from '@/types/order'
 import http, { unwrap } from './http'
 
 /**
@@ -61,6 +61,10 @@ export async function exportOrders(ids: number[]): Promise<ExportedFile> {
 
 export function createDraftOrder(payload: CreateDraftPayload): Promise<Order> {
   return unwrap<Order>(http.post('/createDraftOrder', payload))
+}
+
+export function getOrderDetail(id: number): Promise<OrderDetail> {
+  return unwrap<OrderDetail>(http.post('/queryOrderDetail', { id }))
 }
 
 export function getOrderLogs(orderId: number): Promise<OrderLog[]> {

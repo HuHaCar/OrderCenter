@@ -25,6 +25,23 @@ services:
       retries: 20
       start_period: 15s
 
+  redis:
+    image: redis:7-alpine
+    container_name: order-center-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - order_center_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   order_center_mysql_data:
     name: order-center-mysql-data
+  order_center_redis_data:
+    name: order-center-redis-data

@@ -3,6 +3,7 @@ package com.ordercenter.order;
 import com.ordercenter.auth.AuthPrincipal;
 import com.ordercenter.common.PageResult;
 import com.ordercenter.file.OrderAttachmentService;
+import com.ordercenter.order.detail.OrderDetailCacheService;
 import com.ordercenter.order.dto.CreateDraftOrderRequest;
 import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.OrderResponse;
@@ -40,17 +41,20 @@ public class OrderService {
     private final ShippingMethodCatalog shippingMethodCatalog;
     private final OrderLogService orderLogService;
     private final OrderAttachmentService orderAttachmentService;
+    private final OrderDetailCacheService orderDetailCacheService;
 
     public OrderService(
             OrderRepository orderRepository,
             ShippingMethodCatalog shippingMethodCatalog,
             OrderLogService orderLogService,
-            OrderAttachmentService orderAttachmentService
+            OrderAttachmentService orderAttachmentService,
+            OrderDetailCacheService orderDetailCacheService
     ) {
         this.orderRepository = orderRepository;
         this.shippingMethodCatalog = shippingMethodCatalog;
         this.orderLogService = orderLogService;
         this.orderAttachmentService = orderAttachmentService;
+        this.orderDetailCacheService = orderDetailCacheService;
     }
 
     public PageResult<OrderResponse> page(
@@ -227,6 +231,7 @@ public class OrderService {
                 : "编辑订单，物流信息变更，状态：" + beforeStatus.getLabel()
                     + " → " + saved.getStatus().getLabel();
         orderLogService.record(saved, OrderLogAction.UPDATE, updateDescription);
+        orderDetailCacheService.evictAfterCommit(saved.getId());
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -247,6 +252,7 @@ public class OrderService {
         orderLogService.record(saved, OrderLogAction.FORECAST,
                 "预报订单，状态：" + OrderStatus.DRAFT.getLabel()
                     + " → " + saved.getStatus().getLabel());
+        orderDetailCacheService.evictAfterCommit(saved.getId());
         return OrderResponse.from(saved, shippingMethodCatalog.labelOf(saved.getShippingMethod()));
     }
 
@@ -274,6 +280,7 @@ public class OrderService {
             orderLogService.record(order, OrderLogAction.DELETE,
                     "删除订单，状态：" + beforeStatus.getLabel()
                         + " → " + OrderStatus.DELETED.getLabel());
+            orderDetailCacheService.evictAfterCommit(order.getId());
         }
         return orders.size();
     }

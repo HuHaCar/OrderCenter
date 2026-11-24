@@ -8,9 +8,12 @@ import com.ordercenter.order.dto.CreateOrderRequest;
 import com.ordercenter.order.dto.DeleteOrdersRequest;
 import com.ordercenter.order.dto.ExportOrdersRequest;
 import com.ordercenter.order.dto.ForecastOrderRequest;
+import com.ordercenter.order.dto.OrderDetailRequest;
+import com.ordercenter.order.dto.OrderDetailResponse;
 import com.ordercenter.order.dto.OrderResponse;
 import com.ordercenter.order.dto.UpdateOrderRequest;
 import com.ordercenter.order.export.ExportedFile;
+import com.ordercenter.order.detail.OrderDetailService;
 import com.ordercenter.order.export.OrderExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,10 +43,16 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderExportService orderExportService;
+    private final OrderDetailService orderDetailService;
 
-    public OrderController(OrderService orderService, OrderExportService orderExportService) {
+    public OrderController(
+            OrderService orderService,
+            OrderExportService orderExportService,
+            OrderDetailService orderDetailService
+    ) {
         this.orderService = orderService;
         this.orderExportService = orderExportService;
+        this.orderDetailService = orderDetailService;
     }
 
     @Operation(summary = "健康检查")
@@ -80,6 +89,17 @@ public class OrderController {
                 OrderStatus.fromCode(status),
                 principal.userId()
         ));
+    }
+
+    @Operation(summary = "订单详情")
+    @PostMapping("/queryOrderDetail")
+    public ApiResponse<OrderDetailResponse> detail(
+            @Valid @RequestBody OrderDetailRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal
+    ) {
+        return ApiResponse.ok(
+                orderDetailService.getDetail(request.id(), principal.userId())
+        );
     }
 
     @Operation(summary = "新增订单")

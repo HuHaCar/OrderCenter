@@ -32,6 +32,7 @@ public class OrderAttachmentService {
             return;
         }
 
+        // 去重并校验附件数量
         List<Long> distinctIds = attachmentIds.stream().distinct().toList();
         if (distinctIds.size() > properties.getMaxAttachments()) {
             throw new IllegalArgumentException(
@@ -39,15 +40,18 @@ public class OrderAttachmentService {
             );
         }
 
+        // 批量查询文件元数据
         List<FileAsset> files = fileAssetRepository.findAllById(distinctIds);
         if (files.size() != distinctIds.size()) {
             throw new IllegalArgumentException("部分附件不存在，请重新上传");
         }
 
+        // 防止关联其他用户上传的附件
         if (files.stream().anyMatch(file -> !file.getUploadedBy().equals(currentUserId))) {
             throw new IllegalArgumentException("不能关联其他用户上传的附件");
         }
 
+        // 保存订单与文件的关联关系
         List<OrderAttachment> attachments = distinctIds.stream()
                 .map(fileId -> {
                     OrderAttachment attachment = new OrderAttachment();

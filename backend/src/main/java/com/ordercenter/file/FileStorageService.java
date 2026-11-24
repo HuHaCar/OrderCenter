@@ -59,6 +59,7 @@ public class FileStorageService {
 
     @Transactional
     public FileAsset store(MultipartFile file, Long uploadedBy) {
+        // 校验空文件与大小限制
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("上传文件不能为空");
         }
@@ -68,6 +69,7 @@ public class FileStorageService {
             );
         }
 
+        // 清洗原始文件名并校验扩展名
         String originalName = sanitizeOriginalName(file.getOriginalFilename());
         String extension = extensionOf(originalName);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
@@ -78,17 +80,20 @@ public class FileStorageService {
         String datePath = LocalDate.now(ZoneId.of("Asia/Shanghai"))
                 .toString()
                 .replace("-", "/");
+        // 生成日期目录与 UUID 存储名，避免使用用户文件名作为路径
         String storedName = UUID.randomUUID() + "." + extension;
         String storageKey = datePath + "/" + storedName;
         Path target = resolveStoragePath(storageKey);
 
         try {
+            // 流式写入磁盘并同步计算 SHA-256
             Files.createDirectories(target.getParent());
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             try (InputStream input = new DigestInputStream(file.getInputStream(), digest)) {
                 Files.copy(input, target);
             }
 
+            // 写入文件元数据；数据库失败时删除已落盘文件
             FileAsset asset = new FileAsset();
             asset.setOriginalName(originalName);
             asset.setStorageKey(storageKey);

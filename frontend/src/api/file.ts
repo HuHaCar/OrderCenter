@@ -27,3 +27,11 @@ export async function downloadFile(fileId: number): Promise<Blob> {
   })
   return response.data as Blob
 }
+
+export async function previewFile(fileId: number): Promise<Blob> {
+  const response = await http.get(`/files/${fileId}/preview`, {
+    responseType: 'blob',
+    timeout: 0,
+  })
+  return response.data as Blob
+}
