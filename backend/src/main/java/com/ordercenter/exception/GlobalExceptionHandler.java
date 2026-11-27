@@ -3,9 +3,11 @@ package com.ordercenter.exception;
 import com.ordercenter.auth.RefreshTokenException;
 import com.ordercenter.common.ApiResponse;
 import com.ordercenter.order.OrderNotFoundException;
+import com.ordercenter.order.lock.OrderLockedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -66,6 +68,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(401, exception.getMessage()));
     }
 
+    @ExceptionHandler(OrderLockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOrderLocked(OrderLockedException exception) {
+        String message = exception.getMessage() == null
+                ? "订单正在被其他操作处理，请稍后重试"
+                : exception.getMessage();
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(409, message));
+    }
+
     @ExceptionHandler(OrderNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleOrderNotFound(OrderNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -82,6 +93,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.fail(404, "接口不存在"));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(
+            OptimisticLockingFailureException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(409, "订单已被其他人修改，请刷新后重试"));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

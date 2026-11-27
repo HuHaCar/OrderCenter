@@ -15,6 +15,7 @@ import com.ordercenter.order.dto.UpdateOrderRequest;
 import com.ordercenter.order.export.ExportedFile;
 import com.ordercenter.order.detail.OrderDetailService;
 import com.ordercenter.order.export.OrderExportService;
+import com.ordercenter.order.lock.OrderLockService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,15 +45,18 @@ public class OrderController {
     private final OrderService orderService;
     private final OrderExportService orderExportService;
     private final OrderDetailService orderDetailService;
+    private final OrderLockService orderLockService;
 
     public OrderController(
             OrderService orderService,
             OrderExportService orderExportService,
-            OrderDetailService orderDetailService
+            OrderDetailService orderDetailService,
+            OrderLockService orderLockService
     ) {
         this.orderService = orderService;
         this.orderExportService = orderExportService;
         this.orderDetailService = orderDetailService;
+        this.orderLockService = orderLockService;
     }
 
     @Operation(summary = "健康检查")
@@ -117,19 +121,34 @@ public class OrderController {
     @Operation(summary = "编辑订单")
     @PostMapping("/updateOrder")
     public ApiResponse<OrderResponse> update(@Valid @RequestBody UpdateOrderRequest request) {
-        return ApiResponse.ok(orderService.update(request.id(), request));
+        return ApiResponse.ok(
+                orderLockService.withOrderLock(
+                        request.id(),
+                        () -> orderService.update(request.id(), request)
+                )
+        );
     }
 
     @Operation(summary = "预报订单")
     @PostMapping("/forecastOrder")
     public ApiResponse<OrderResponse> forecast(@Valid @RequestBody ForecastOrderRequest request) {
-        return ApiResponse.ok(orderService.forecast(request.id()));
+        return ApiResponse.ok(
+                orderLockService.withOrderLock(
+                        request.id(),
+                        () -> orderService.forecast(request.id())
+                )
+        );
     }
 
     @Operation(summary = "批量删除订单（单行删除也复用）")
     @PostMapping("/deleteOrders")
     public ApiResponse<Integer> deleteOrders(@Valid @RequestBody DeleteOrdersRequest request) {
-        return ApiResponse.ok(orderService.deleteOrders(request.ids()));
+        return ApiResponse.ok(
+                orderLockService.withOrderLocks(
+                        request.ids(),
+                        () -> orderService.deleteOrders(request.ids())
+                )
+        );
     }
 
     @Operation(summary = "批量导出订单（.xlsx）")

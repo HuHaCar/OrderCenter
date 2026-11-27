@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -66,6 +67,13 @@ public class Order {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * 乐观锁版本号，作为分布式锁之外的数据库兜底。
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @PrePersist
     void onCreate() {
@@ -189,6 +197,10 @@ public class Order {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public LocalDateTime getUpdatedAt() {
